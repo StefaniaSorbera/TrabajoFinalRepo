@@ -1,57 +1,119 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "TrabajoFINALCharacter.h" // <- padre heredado del template
+#include "TrabajoFINALCharacter.h"
 #include "LSCharacter.generated.h"
+
+class USphereComponent;
+class ULSHUDWidget;
+class ALSPlayerController;
 
 UCLASS()
 class TRABAJOFINAL_API ALSCharacter : public ATrabajoFINALCharacter
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	// --- Salud ---
-	UPROPERTY(ReplicatedUsing = OnRep_CurrentHealth,
-		BlueprintReadOnly, Category = "Health")
-	float CurrentHealth = 100.f;
+    ALSCharacter();
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Health")
-	float MaxHealth = 100.f;
+    // --- Corazones (vidas) ---
+    UPROPERTY(ReplicatedUsing = OnRep_HeartsLeft,
+        BlueprintReadOnly, Category = "Lives")
+    int32 HeartsLeft = 3;
 
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "State")
-	bool bIsDead = false;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lives")
+    int32 MaxHearts = 3;
 
-	void TakeDamageFromAttacker(float DamageAmount, AController* Attacker);
+    // --- Estado ---
+    UPROPERTY(ReplicatedUsing = OnRep_bIsDead,
+        BlueprintReadOnly, Category = "State")
+    bool bIsDead = false;
 
-	bool IsAlive() const { return !bIsDead; }
+    // --- Dash / Empuje ---
+    // Fuerza del impulso al hacer dash
+    UPROPERTY(EditDefaultsOnly, Category = "Combat")
+    float DashImpulseStrength = 1800.f;
 
-	// --- Server RPC ---
-	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_Fire(FVector_NetQuantize TraceStart,
-					 FVector_NetQuantize TraceEnd);
+    // Fuerza de knockback al colisionar con otro jugador
+    UPROPERTY(EditDefaultsOnly, Category = "Combat")
+    float KnockbackStrength = 1200.f;
 
-	// --- Multicast RPCs ---
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_PlayDeathFX();
+    // Radio de detección de colisión para empuje
+    UPROPERTY(EditDefaultsOnly, Category = "Combat")
+    float KnockbackRadius = 120.f;
 
-	UFUNCTION(NetMulticast, Unreliable)
-	void Multicast_PlayHitFX(FVector HitLocation);
+    bool IsAlive() const { return !bIsDead; }
+
+    // Llamado desde FellOutOfWorld
+    void LoseHeart();
+
+    // --- Server RPCs ---
+    UFUNCTION(Server, Reliable, WithValidation)
+    void Server_Dash();
+
+    // --- Multicast RPCs ---
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_PlayDeathFX();
+
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_PlayRespawnFX();
+
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_PlayDashFX();
+    
+    // Mesh visual de la pelota
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ball")
+    UStaticMeshComponent* BallMesh;
+
+    // Colisión de rebote entre jugadores
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ball")
+    USphereComponent* BallCollision;
+
+    void ApplyKnockbackLogic(ALSCharacter* OtherChar, const FVector& Vector, float ImpulseScale);
+    void Server_ApplyKnockback(ALSCharacter* OtherChar, const FVector& Vector, float ImpulseScale);
+    // Llamado cuando la esfera toca otro jugador
+    UFUNCTION()
+    void OnBallOverlap(UPrimitiveComponent* OverlappedComp,
+                       AActor* OtherActor,
+                       UPrimitiveComponent* OtherComp,
+                       int32 OtherBodyIndex,
+                       bool bFromSweep,
+                       const FHitResult& SweepResult);
 
 protected:
-	UFUNCTION()
-	void OnRep_CurrentHealth();
+    virtual void BeginPlay() override;
 
-	void HandleDeath(AController* Killer);
+    // RepNotify corazones → actualiza HUD
+    UFUNCTION()
+    void OnRep_HeartsLeft();
 
-	// Disparo — se llama desde el input del template
-	void OnFirePressed();
+    // RepNotify muerte → activa efectos
+    UFUNCTION()
+    void OnRep_bIsDead();
+    void Tick(float DeltaTime);
 
-	virtual void FellOutOfWorld(
-		const UDamageType& DmgType) override;
+    void HandleDeath();
+    void HandleRespawn();
+    void DoRespawn();
 
-	virtual void GetLifetimeReplicatedProps(
-		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    // Input
+    void OnDashPressed();
 
-	UPROPERTY(EditDefaultsOnly, Category = "Combat")
-	float FireRange = 2000.f;
+    // Cooldown del dash
+    bool bCanDash = true;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Combat")
+    float DashCooldown = 1.5f;
+
+    FTimerHandle DashCooldownHandle;
+    FTimerHandle RespawnHandle;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Combat")
+    float RespawnDelay = 3.f;
+
+    virtual void FellOutOfWorld(
+        const UDamageType& DmgType) override;
+
+    virtual void GetLifetimeReplicatedProps(
+        TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };

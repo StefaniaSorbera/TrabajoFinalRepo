@@ -29,7 +29,9 @@
   </component>
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$PROJECT_DIR$/../../../../../../Program Files/Epic Games/UE_5.6/Engine/Source/Runtime/MovieScene/Public/EntitySystem/MovieSceneSharedPlaybackState.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/TrabajoFINAL/Private/LSDeathWidget.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/TrabajoFINAL/Private/LSHUDWidget.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/TrabajoFINAL/Public/LSDeathWidget.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/TrabajoFINAL/Public/LSHUDWidget.h" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="ProjectColorInfo">{
@@ -184,6 +186,9 @@
       <workItem from="1779041852228" duration="6533000" />
       <workItem from="1779050470998" duration="297000" />
       <workItem from="1779309426104" duration="55000" />
+      <workItem from="1779313886239" duration="2388000" />
+      <workItem from="1779401651966" duration="866000" />
+      <workItem from="1779555943022" duration="7551000" />
     </task>
     <servers />
   </component>

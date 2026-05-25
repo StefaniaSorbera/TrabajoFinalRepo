@@ -39,6 +39,7 @@ public:
 	void AddKill();
 	void SetPlayerDead();
 	void SetPlayerAlive();
+	void SetLivesLeft(int32 NewLives);
 
 	// Consultada por GameMode para contar jugadores vivos
 	bool IsAlive() const;

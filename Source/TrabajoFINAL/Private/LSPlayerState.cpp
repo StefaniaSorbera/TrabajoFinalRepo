@@ -53,4 +53,12 @@ void ALSPlayerState::OnRep_PlayerStatus()
 	// Acá podés actualizar el HUD o efectos visuales
 	UE_LOG(LogTemp, Log, TEXT("PlayerStatus cambió: %d"),
 		(uint8)PlayerStatus);
+	
+}
+void ALSPlayerState::SetLivesLeft(int32 NewLives)
+{
+	if (GetLocalRole() == ROLE_Authority)
+	{
+		LivesLeft = NewLives;
+	}
 }
