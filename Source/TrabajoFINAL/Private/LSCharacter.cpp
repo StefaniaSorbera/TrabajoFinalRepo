@@ -3,6 +3,7 @@
 #include "LSPlayerController.h"
 #include "LSPlayerState.h"
 #include "LSGameMode.h"
+#include "LSRespawnPoint.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
@@ -48,6 +49,13 @@ ALSCharacter::ALSCharacter()
         ECC_Pawn, ECR_Overlap);
 
     BallCollision->SetIsReplicated(true);
+    
+    // --- Movimiento tipo pelota (menos hielo) ---
+    GetCharacterMovement()->GroundFriction = 8.f;          // default 8, subilo si frena muy rápido
+    GetCharacterMovement()->BrakingDecelerationWalking = 500.f;  // default 2048 — esto es lo que los frena en seco
+    GetCharacterMovement()->BrakingFrictionFactor = 1.f;   // default 2 — reduce el freno al soltar
+    GetCharacterMovement()->MaxAcceleration = 800.f;       // default 2048 — aceleración más gradual
+    GetCharacterMovement()->MaxWalkSpeed = 800.f;          // ajustá a gusto
 
     // Ocultamos el Skeletal Mesh del template
     GetMesh()->SetVisibility(false);
@@ -55,18 +63,46 @@ ALSCharacter::ALSCharacter()
     // Ajustamos la cápsula al tamaño de la pelota
     GetCapsuleComponent()->SetCapsuleRadius(55.f);
     GetCapsuleComponent()->SetCapsuleHalfHeight(55.f);
+    
+    // En el constructor, después de crearlos:
+    GetCharacterMovement()->BrakingDecelerationWalking = BallBrakingDeceleration;
+    GetCharacterMovement()->GroundFriction = BallGroundFriction;
 }
 // -----------------------------------------------
 // REPLICACIÓN
 // -----------------------------------------------
-void ALSCharacter::BeginPlay()
-{
-    Super::BeginPlay();
 
-    // Todos bindean el overlap, no solo el servidor
-    BallCollision->OnComponentBeginOverlap.AddDynamic(
-        this, &ALSCharacter::OnBallOverlap);
-}
+    void ALSCharacter::BeginPlay()
+    {
+        Super::BeginPlay();
+
+        // Todos bindean el overlap, no solo el servidor
+        BallCollision->OnComponentBeginOverlap.AddDynamic(
+            this, &ALSCharacter::OnBallOverlap);
+
+        // --- NUEVO: cámara del nivel ---
+        if (IsLocallyControlled())
+        {
+            APlayerController* PC =
+                Cast<APlayerController>(GetController());
+
+            if (PC)
+            {
+                ACameraActor* LevelCam =
+                    Cast<ACameraActor>(
+                        UGameplayStatics::GetActorOfClass(
+                            GetWorld(), ACameraActor::StaticClass()));
+
+                if (LevelCam)
+                {
+                    PC->SetViewTargetWithBlend(
+                        LevelCam, 0.f);
+                }
+            }
+        }
+    }
+
+
 void ALSCharacter::OnBallOverlap(
     UPrimitiveComponent* OverlappedComp,
     AActor* OtherActor,
@@ -75,58 +111,36 @@ void ALSCharacter::OnBallOverlap(
     bool bFromSweep,
     const FHitResult& SweepResult)
 {
-    ALSCharacter* OtherChar =
-        Cast<ALSCharacter>(OtherActor);
+    ALSCharacter* OtherChar = Cast<ALSCharacter>(OtherActor);
+    if (!OtherChar || !OtherChar->IsAlive() || !IsAlive()) return;
 
-    if (!OtherChar || !OtherChar->IsAlive() || !IsAlive())
-        return;
+    // AGREGAR: evitar que se ejecute dos veces en host
+    // (una vez por cada pelota que detecta el overlap)
+    if (!IsLocallyControlled()) return;
 
-    FVector KnockDir =
-        (OtherChar->GetActorLocation() -
-         GetActorLocation()).GetSafeNormal2D();
+    FVector KnockDir = (OtherChar->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 
-    float Speed = FMath::Clamp(
-        GetCharacterMovement()->Velocity.Size(),
-        300.f, 1500.f);
-
+    float Speed = FMath::Clamp(GetCharacterMovement()->Velocity.Size(), 300.f, 1500.f);
     float ImpulseScale = FMath::GetMappedRangeValueClamped(
-        FVector2D(300.f, 1500.f),
-        FVector2D(600.f, KnockbackStrength),
-        Speed);
+       FVector2D(300.f, 1500.f),
+       FVector2D(900.f, KnockbackStrength),  // mínimo: 600 → 900
+       Speed);
 
     if (HasAuthority())
     {
-        // Es el servidor/host — aplica directo
         ApplyKnockbackLogic(OtherChar, KnockDir, ImpulseScale);
     }
-    else if (IsLocallyControlled())
+    else
     {
-        // Es un cliente puro — pide al servidor
+        // RPC al servidor
         Server_ApplyKnockback(OtherChar, KnockDir, ImpulseScale);
 
-        // Rebote local inmediato para responsividad
+        // Predicción local del rebote propio
         GetCharacterMovement()->AddImpulse(
-            -KnockDir * (ImpulseScale * 0.4f) +
-            FVector(0.f, 0.f, 200.f), true);
+            -KnockDir * (ImpulseScale * 0.4f) + FVector(0.f, 0.f, 200.f), true);
     }
 }
-void ALSCharacter::ApplyKnockbackLogic(
-    ALSCharacter* Target,
-    FVector KnockDirection,
-    float ImpulseScale)
-{
-    if (!Target) return;
 
-    // Impulso al jugador golpeado — más fuerte
-    Target->GetCharacterMovement()->AddImpulse(
-        KnockDirection * ImpulseScale * 5.f +
-        FVector(0.f, 0.f, 800.f), true);
-
-    // Rebote propio — más suave
-    GetCharacterMovement()->AddImpulse(
-        -KnockDirection * (ImpulseScale * 0.15f) +
-        FVector(0.f, 0.f, 100.f), true);
-}
 void ALSCharacter::GetLifetimeReplicatedProps(
     TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -298,13 +312,7 @@ void ALSCharacter::LoseHeart()
     }
 }
 
-void ALSCharacter::Server_ApplyKnockback_Implementation(
-    ALSCharacter* Target,
-    FVector KnockDirection,
-    float ImpulseScale)
-{
-    ApplyKnockbackLogic(Target, KnockDirection, ImpulseScale);
-}
+
 
 void ALSCharacter::HandleDeath()
 {
@@ -341,20 +349,57 @@ void ALSCharacter::DoRespawn()
 {
     if (GetLocalRole() != ROLE_Authority) return;
 
-    // Buscamos un PlayerStart y teletransportamos
-    AActor* SpawnPoint =
-        UGameplayStatics::GetActorOfClass(
-            GetWorld(), APlayerStart::StaticClass());
+    // Buscamos todos los respawn points del nivel
+    TArray<AActor*> RespawnPoints;
+    UGameplayStatics::GetAllActorsOfClass(
+        GetWorld(),
+        ALSRespawnPoint::StaticClass(),
+        RespawnPoints);
 
-    if (SpawnPoint)
+    FVector SpawnLocation = GetActorLocation(); // fallback
+
+    if (RespawnPoints.Num() > 0)
     {
-        SetActorLocation(
-            SpawnPoint->GetActorLocation() + FVector(0,0,100));
+        // Elegimos uno al azar
+        int32 RandomIndex = FMath::RandRange(
+            0, RespawnPoints.Num() - 1);
+
+        ALSRespawnPoint* ChosenPoint =
+            Cast<ALSRespawnPoint>(RespawnPoints[RandomIndex]);
+
+        if (ChosenPoint)
+        {
+            SpawnLocation = ChosenPoint->GetSpawnLocation();
+        }
+        // Marcamos al jugador como vivo en el PlayerState
+        ALSPlayerState* PS =
+            GetController()->GetPlayerState<ALSPlayerState>();
+        if (PS) PS->SetPlayerAlive(); // <- agregar esto
+
+        GetCharacterMovement()->StopMovementImmediately();
+        bIsDead = false;
+        Multicast_PlayRespawnFX();
     }
 
+    SetActorLocation(SpawnLocation);
     GetCharacterMovement()->StopMovementImmediately();
     bIsDead = false;
     Multicast_PlayRespawnFX();
+
+    // Restauramos la cámara del nivel
+    APlayerController* PC =
+        Cast<APlayerController>(GetController());
+    if (PC)
+    {
+        ACameraActor* LevelCam =
+            Cast<ACameraActor>(
+                UGameplayStatics::GetActorOfClass(
+                    GetWorld(), ACameraActor::StaticClass()));
+        if (LevelCam)
+        {
+            PC->SetViewTargetWithBlend(LevelCam, 0.f);
+        }
+    }
 }
 
 // -----------------------------------------------
@@ -387,4 +432,27 @@ void ALSCharacter::Multicast_PlayDashFX_Implementation()
 {
     // Acá podés agregar partículas o sonido de dash
     UE_LOG(LogTemp, Log, TEXT("%s hizo dash"), *GetName());
+}
+
+void ALSCharacter::ApplyKnockbackLogic(ALSCharacter* OtherChar, const FVector& KnockDir, float ImpulseScale)
+{
+    if (!OtherChar || !HasAuthority()) return;
+
+    // Impactado — impulso fuerte solo en XY
+    OtherChar->GetCharacterMovement()->AddImpulse(
+        KnockDir * ImpulseScale, true);
+
+    // El que pega — rebote suave solo en XY
+    GetCharacterMovement()->AddImpulse(
+        -KnockDir * (ImpulseScale * 10.2f), true);
+}
+
+bool ALSCharacter::Server_ApplyKnockback_Validate(ALSCharacter* OtherChar, const FVector& KnockDir, float ImpulseScale)
+{
+    return true;
+}
+
+void ALSCharacter::Server_ApplyKnockback_Implementation(ALSCharacter* OtherChar, const FVector& KnockDir, float ImpulseScale)
+{
+    ApplyKnockbackLogic(OtherChar, KnockDir, ImpulseScale);
 }

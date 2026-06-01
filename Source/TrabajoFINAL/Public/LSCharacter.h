@@ -1,5 +1,5 @@
 #pragma once
-
+#include "Camera/CameraActor.h"
 #include "CoreMinimal.h"
 #include "TrabajoFINALCharacter.h"
 #include "LSCharacter.generated.h"
@@ -23,7 +23,12 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lives")
     int32 MaxHearts = 3;
+    
+    UPROPERTY(EditDefaultsOnly, Category = "Movement")
+    float BallBrakingDeceleration = 50.f;
 
+    UPROPERTY(EditDefaultsOnly, Category = "Movement")
+    float BallGroundFriction = 5.f;
     // --- Estado ---
     UPROPERTY(ReplicatedUsing = OnRep_bIsDead,
         BlueprintReadOnly, Category = "State")
@@ -36,7 +41,7 @@ public:
 
     // Fuerza de knockback al colisionar con otro jugador
     UPROPERTY(EditDefaultsOnly, Category = "Combat")
-    float KnockbackStrength = 1200.f;
+    float KnockbackStrength = 250000.f;
 
     // Radio de detección de colisión para empuje
     UPROPERTY(EditDefaultsOnly, Category = "Combat")
@@ -69,8 +74,12 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ball")
     USphereComponent* BallCollision;
 
-    void ApplyKnockbackLogic(ALSCharacter* OtherChar, const FVector& Vector, float ImpulseScale);
-    void Server_ApplyKnockback(ALSCharacter* OtherChar, const FVector& Vector, float ImpulseScale);
+    // POR ESTAS:
+    void ApplyKnockbackLogic(ALSCharacter* OtherChar, const FVector& KnockDir, float ImpulseScale);
+
+    UFUNCTION(Server, Reliable, WithValidation)
+    void Server_ApplyKnockback(ALSCharacter* OtherChar, const FVector& KnockDir, float ImpulseScale);
+    
     // Llamado cuando la esfera toca otro jugador
     UFUNCTION()
     void OnBallOverlap(UPrimitiveComponent* OverlappedComp,
@@ -79,7 +88,9 @@ public:
                        int32 OtherBodyIndex,
                        bool bFromSweep,
                        const FHitResult& SweepResult);
-
+// Referencia a la cámara del nivel
+UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+class ACameraActor* LevelCamera;
 protected:
     virtual void BeginPlay() override;
 

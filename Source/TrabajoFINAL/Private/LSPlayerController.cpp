@@ -1,7 +1,7 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #include "LSPlayerController.h"
-#include "Blueprint/UserWidget.h"
+#include "LSHUDWidget.h"
+#include "LSEndGameWidget.h"
+#include "LSDeathWidget.h"
 
 ALSPlayerController::ALSPlayerController()
 {
@@ -11,16 +11,13 @@ void ALSPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Solo el cliente local crea su HUD
 	if (IsLocalController())
 	{
 		if (HUDWidgetClass)
 		{
-			HUDWidget = CreateWidget<UUserWidget>(this, HUDWidgetClass);
-			if (HUDWidget)
-			{
-				HUDWidget->AddToViewport();
-			}
+			HUDWidget = CreateWidget<ULSHUDWidget>(
+				this, HUDWidgetClass);
+			if (HUDWidget) HUDWidget->AddToViewport();
 		}
 	}
 }
@@ -28,24 +25,61 @@ void ALSPlayerController::BeginPlay()
 void ALSPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-	// El input lo vamos a configurar en el Character
-	// Acá podés agregar inputs de menú (pausa, etc.)
 }
 
-// --- Implementación de Client RPCs ---
+// --- Client RPCs ---
 
 void ALSPlayerController::Client_ShowVictory_Implementation()
 {
-	// Corre solo en el cliente dueño
+	if (EndGameWidgetClass)
+	{
+		EndGameWidget = CreateWidget<ULSEndGameWidget>(
+			this, EndGameWidgetClass);
+		if (EndGameWidget)
+		{
+			EndGameWidget->AddToViewport(10);
+			EndGameWidget->SetupAsVictory();
+		}
+	}
 	BP_ShowVictoryScreen();
 }
 
 void ALSPlayerController::Client_ShowDefeat_Implementation()
 {
+	if (EndGameWidgetClass)
+	{
+		EndGameWidget = CreateWidget<ULSEndGameWidget>(
+			this, EndGameWidgetClass);
+		if (EndGameWidget)
+		{
+			EndGameWidget->AddToViewport(10);
+			EndGameWidget->SetupAsDefeat();
+		}
+	}
 	BP_ShowDefeatScreen();
 }
 
 void ALSPlayerController::Client_ShowDeathScreen_Implementation()
 {
+	if (DeathWidgetClass)
+	{
+		DeathWidget = CreateWidget<ULSDeathWidget>(
+			this, DeathWidgetClass);
+		if (DeathWidget)
+		{
+			DeathWidget->AddToViewport(5);
+			DeathWidget->StartRespawnCountdown(3.f);
+		}
+	}
 	BP_ShowDeathScreen();
+}
+
+void ALSPlayerController::Client_StartRestartCountdown_Implementation(
+	float Seconds)
+{
+	if (EndGameWidget)
+	{
+		EndGameWidget->StartCountdown(Seconds);
+	}
+	BP_StartRestartCountdown(Seconds);
 }

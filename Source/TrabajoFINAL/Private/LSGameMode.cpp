@@ -1,63 +1,89 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "LSGameMode.h"
 #include "LSGameState.h"
 #include "LSPlayerState.h"
 #include "LSPlayerController.h"
-#include "GameFramework/PlayerController.h"
+#include "LSCharacter.h"
 #include "EngineUtils.h"
 
 ALSGameMode::ALSGameMode()
 {
-    // Asignamos nuestras clases al framework
     GameStateClass        = ALSGameState::StaticClass();
     PlayerStateClass      = ALSPlayerState::StaticClass();
     PlayerControllerClass = ALSPlayerController::StaticClass();
+    DefaultPawnClass      = ALSCharacter::StaticClass();
 }
 
 void ALSGameMode::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Inicializamos el GameState
+    // Inicializamos GameState
     ALSGameState* GS = GetGameState<ALSGameState>();
     if (GS)
     {
         GS->SetMatchState(EMatchState::InProgress);
-        GS->PlayersAlive = GetNumPlayers(); // cantidad de jugadores conectados
+        GS->PlayersAlive = GetNumPlayers();
+        GS->SetMatchTime(MatchDuration);
     }
 
-    // Timer de la partida
+    // Timer que descuenta el tiempo cada segundo
     GetWorldTimerManager().SetTimer(
-        MatchTimerHandle,
-        this,
-        &ALSGameMode::OnMatchTimeUp,
-        MatchDuration,
-        false
-    );
-}
-    
+        MatchTickHandle,
+        [this]()
+        {
+            ALSGameState* GS = GetGameState<ALSGameState>();
+            if (!GS) return;
 
-void ALSGameMode::PlayerDied(AController* DeadPlayer, AController* Killer)
+            float NewTime = GS->MatchTime - 1.f;
+            GS->SetMatchTime(FMath::Max(0.f, NewTime));
+
+            if (NewTime <= 0.f)
+            {
+                GetWorldTimerManager().ClearTimer(MatchTickHandle);
+                OnMatchTimeUp();
+            }
+        },
+        1.f,   // cada 1 segundo
+        true); // loop
+}
+
+void ALSGameMode::PlayerDied(AController* DeadPlayer,
+                              AController* Killer)
 {
     if (!HasAuthority()) return;
 
-    // Sumamos kill al que mató (si no se mató solo)
+    // Sumamos kill al asesino
     if (Killer && Killer != DeadPlayer)
     {
-        ALSPlayerState* KillerPS = Killer->GetPlayerState<ALSPlayerState>();
+        ALSPlayerState* KillerPS =
+            Killer->GetPlayerState<ALSPlayerState>();
         if (KillerPS) KillerPS->AddKill();
+
+        // Actualizamos HUD del killer
+        ALSPlayerController* KillerPC =
+            Cast<ALSPlayerController>(Killer);
+        if (KillerPC)
+        {
+            KillerPC->BP_UpdateKillCount(
+                KillerPS->KillCount);
+        }
     }
 
-    // Decrementamos vida y marcamos muerto
-    ALSPlayerState* DeadPS = DeadPlayer->GetPlayerState<ALSPlayerState>();
+    // Marcamos al jugador muerto
+    ALSPlayerState* DeadPS =
+        DeadPlayer->GetPlayerState<ALSPlayerState>();
     if (DeadPS) DeadPS->SetPlayerDead();
 
-    // Actualizamos GameState
+    // Decrementamos jugadores vivos en GameState
     ALSGameState* GS = GetGameState<ALSGameState>();
     if (GS) GS->DecrementPlayersAlive();
 
+    // Notificamos derrota al cliente eliminado
+    ALSPlayerController* DeadPC =
+        Cast<ALSPlayerController>(DeadPlayer);
+    if (DeadPC) DeadPC->Client_ShowDefeat();
+
+    // Chequeamos si alguien ganó
     CheckVictoryCondition();
 }
 
@@ -65,40 +91,57 @@ void ALSGameMode::CheckVictoryCondition()
 {
     TArray<AController*> AlivePlayers;
 
-    // Recorremos todos los PlayerControllers activos
-    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    for (FConstPlayerControllerIterator It =
+        GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
-        ALSPlayerController* PC = Cast<ALSPlayerController>(It->Get());
+        ALSPlayerController* PC =
+            Cast<ALSPlayerController>(It->Get());
         if (!PC) continue;
 
-        ALSPlayerState* PS = PC->GetPlayerState<ALSPlayerState>();
+        ALSPlayerState* PS =
+            PC->GetPlayerState<ALSPlayerState>();
+
+        // Contamos solo los que siguen vivos
         if (PS && PS->IsAlive())
         {
             AlivePlayers.Add(PC);
         }
     }
 
-    // Condición de victoria: queda 1 solo jugador
     if (AlivePlayers.Num() == 1)
     {
+        // Hay un ganador
         EndMatch(AlivePlayers[0]);
     }
     else if (AlivePlayers.Num() == 0)
     {
-        EndMatch(nullptr); // Empate / todos muertos
+        // Todos muertos al mismo tiempo — empate
+        EndMatch(nullptr);
     }
+    // Si quedan 2+ vivos seguimos jugando
 }
 
 void ALSGameMode::EndMatch(AController* Winner)
 {
-    GetWorldTimerManager().ClearTimer(MatchTimerHandle);
+    GetWorldTimerManager().ClearTimer(MatchTickHandle);
 
-    // Notificamos a cada jugador si ganó o perdió
-    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    // Actualizamos GameState
+    ALSGameState* GS = GetGameState<ALSGameState>();
+    if (GS) GS->SetMatchState(EMatchState::PostGame);
+
+    // Congelamos todos los personajes y mostramos pantalla
+    for (FConstPlayerControllerIterator It =
+        GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
-        ALSPlayerController* PC = Cast<ALSPlayerController>(It->Get());
+        ALSPlayerController* PC =
+            Cast<ALSPlayerController>(It->Get());
         if (!PC) continue;
 
+        // Desactivamos input de todos
+        PC->SetIgnoreMoveInput(true);
+        PC->SetIgnoreLookInput(true);
+
+        // Mostramos pantalla según resultado
         if (PC == Winner)
         {
             PC->Client_ShowVictory();
@@ -107,12 +150,25 @@ void ALSGameMode::EndMatch(AController* Winner)
         {
             PC->Client_ShowDefeat();
         }
+        PC->Client_StartRestartCountdown(RestartDelay);
     }
-}
 
+    // Countdown para reiniciar — 5 segundos
+    GetWorldTimerManager().SetTimer(
+        RestartTimerHandle,
+        this,
+        &ALSGameMode::RestartMatch,
+        5.f,
+        false);
+}
+void ALSGameMode::RestartMatch()
+{
+    // Reiniciamos el nivel para todos
+    GetWorld()->ServerTravel(
+        TEXT("?listen"), false);
+}
 void ALSGameMode::OnMatchTimeUp()
 {
-    // Si se acaba el tiempo, gana el que más kills tiene
-    // (implementar después con PlayerState)
+    // Se acabó el tiempo — chequeamos sobrevivientes
     CheckVictoryCondition();
 }

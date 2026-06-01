@@ -31,8 +31,12 @@
     <setting file="file://$PROJECT_DIR$/../../../../../../Program Files/Epic Games/UE_5.6/Engine/Source/Runtime/MovieScene/Public/EntitySystem/MovieSceneSharedPlaybackState.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/TrabajoFINAL/Private/LSDeathWidget.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/TrabajoFINAL/Private/LSHUDWidget.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/TrabajoFINAL/Private/LSKillZone.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/TrabajoFINAL/Private/LSRespawnPoint.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/TrabajoFINAL/Public/LSDeathWidget.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/TrabajoFINAL/Public/LSHUDWidget.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/TrabajoFINAL/Public/LSKillZone.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/TrabajoFINAL/Public/LSRespawnPoint.h" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 1,
@@ -189,6 +193,9 @@
       <workItem from="1779313886239" duration="2388000" />
       <workItem from="1779401651966" duration="866000" />
       <workItem from="1779555943022" duration="7551000" />
+      <workItem from="1779754749515" duration="2201000" />
+      <workItem from="1780092408928" duration="54000" />
+      <workItem from="1780092598551" duration="4923000" />
     </task>
     <servers />
   </component>
