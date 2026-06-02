@@ -120,7 +120,29 @@ void ALSGameMode::CheckVictoryCondition()
     }
     // Si quedan 2+ vivos seguimos jugando
 }
+void ALSGameMode::AssignHUDSlots()
+{
+    int32 SlotIndex = 0;
 
+    for (FConstPlayerControllerIterator It =
+        GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    {
+        ALSPlayerController* PC =
+            Cast<ALSPlayerController>(It->Get());
+        if (!PC) continue;
+
+        ALSPlayerState* PS =
+            PC->GetPlayerState<ALSPlayerState>();
+        if (PS)
+        {
+            PS->HUDSlotIndex = SlotIndex;
+            SlotIndex++;
+        }
+
+        // Avisamos a cada cliente que inicialice su HUD
+        PC->Client_InitializeHUD();
+    }
+}
 void ALSGameMode::EndMatch(AController* Winner)
 {
     GetWorldTimerManager().ClearTimer(MatchTickHandle);

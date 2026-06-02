@@ -26,7 +26,8 @@ public:
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Player")
 	int32 KillCount = 0;
-
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Player")
+	int32 HUDSlotIndex = 0;
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Player")
 	int32 LivesLeft = 3;
 

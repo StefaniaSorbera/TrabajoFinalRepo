@@ -22,17 +22,6 @@ void ALSGameState::GetLifetimeReplicatedProps(
 	DOREPLIFETIME(ALSGameState, PlayersAlive);
 }
 
-void ALSGameState::SetMatchTime(float NewTime)
-{
-	// Solo el servidor modifica esto
-	if (GetLocalRole() == ROLE_Authority)
-	{
-		MatchTime = NewTime;
-		// Al cambiar en servidor, se replica a clientes
-		// y dispara OnRep_MatchTime en cada uno
-	}
-}
-
 void ALSGameState::DecrementPlayersAlive()
 {
 	if (GetLocalRole() == ROLE_Authority)
@@ -48,14 +37,31 @@ void ALSGameState::SetMatchState(EMatchState NewState)
 		MatchState = NewState;
 	}
 }
+void ALSGameState::SetMatchTime(float NewTime)
+{
+	if (GetLocalRole() == ROLE_Authority)
+	{
+		MatchTime = NewTime;
+
+		// RepNotify no se dispara en servidor
+		// lo llamamos manualmente para el host
+		OnRep_MatchTime();
+	}
+}
 
 void ALSGameState::OnRep_MatchTime()
 {
-	// Buscamos el PlayerController local y actualizamos su HUD
-	APlayerController* PC = GetWorld()->GetFirstPlayerController();
-	ALSPlayerController* LSPC = Cast<ALSPlayerController>(PC);
-	if (LSPC)
+	// Buscamos el PlayerController local
+	for (FConstPlayerControllerIterator It =
+		GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
-		LSPC->BP_UpdateMatchTime(MatchTime);
+		ALSPlayerController* PC =
+			Cast<ALSPlayerController>(It->Get());
+
+		if (PC && PC->IsLocalController())
+		{
+			PC->UpdateHUDTimer(MatchTime);
+			break;
+		}
 	}
 }

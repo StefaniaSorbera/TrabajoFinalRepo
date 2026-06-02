@@ -2,7 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "TrabajoFINALPlayerController.h"
+#include "LSDeathWidget.h"
 #include "LSPlayerController.generated.h"
+
 
 class ULSHUDWidget;
 class ULSEndGameWidget;
@@ -15,11 +17,21 @@ class TRABAJOFINAL_API ALSPlayerController : public ATrabajoFINALPlayerControlle
 
 public:
     ALSPlayerController();
+    UFUNCTION(BlueprintCallable, Category = "HUD")
+    void UpdateHUDHearts(int32 PlayerIdx, int32 HeartsLeft);
 
+    UFUNCTION(BlueprintCallable, Category = "HUD")
+    void UpdateHUDKills(int32 PlayerIdx, int32 Kills);
+
+    UFUNCTION(BlueprintCallable, Category = "HUD")
+    void UpdateHUDTimer(float NewTime);
     // --- Client RPCs ---
     UFUNCTION(Client, Reliable)
     void Client_ShowVictory();
-
+    
+    UPROPERTY(EditDefaultsOnly, Category = "HUD")
+    TSubclassOf<ULSDeathWidget> DeathWidgetClass;
+    
     UFUNCTION(Client, Reliable)
     void Client_ShowDefeat();
 
@@ -38,6 +50,9 @@ public:
 
     UFUNCTION(BlueprintImplementableEvent, Category = "HUD")
     void BP_UpdateLivesLeft(int32 NewLives);
+    
+    UFUNCTION(Client, Reliable)
+    void Client_InitializeHUD();
 
     UFUNCTION(BlueprintImplementableEvent, Category = "HUD")
     void BP_ShowVictoryScreen();
@@ -54,6 +69,7 @@ public:
 protected:
     virtual void BeginPlay() override;
     virtual void SetupInputComponent() override;
+    void InitializeHUD();
 
     // --- Widgets ---
     UPROPERTY(BlueprintReadOnly, Category = "HUD")
@@ -70,7 +86,5 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category = "HUD")
     TSubclassOf<ULSEndGameWidget> EndGameWidgetClass;
-
-    UPROPERTY(EditDefaultsOnly, Category = "HUD")
-    TSubclassOf<ULSDeathWidget> DeathWidgetClass;
+    
 };

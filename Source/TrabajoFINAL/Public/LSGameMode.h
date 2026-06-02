@@ -20,6 +20,7 @@ protected:
 	virtual void BeginPlay() override;
 
 	void CheckVictoryCondition();
+	void AssignHUDSlots();
 	void EndMatch(AController* Winner);
 	void OnMatchTimeUp();
 

@@ -4,6 +4,7 @@
 #include "TrabajoFINALCharacter.h"
 #include "LSCharacter.generated.h"
 
+class ULSDeathWidget;
 class USphereComponent;
 class ULSHUDWidget;
 class ALSPlayerController;
@@ -33,6 +34,9 @@ public:
     UPROPERTY(ReplicatedUsing = OnRep_bIsDead,
         BlueprintReadOnly, Category = "State")
     bool bIsDead = false;
+    
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "HUD")
+    TSubclassOf<ULSDeathWidget> DeathWidgetClass;
 
     // --- Dash / Empuje ---
     // Fuerza del impulso al hacer dash

@@ -40,13 +40,18 @@ void ALSKillZone::OnKillOverlap(
 	bool bFromSweep,
 	const FHitResult& SweepResult)
 {
+	UE_LOG(LogTemp, Warning, 
+		TEXT("KillZone tocado por: %s"),
+		*OtherActor->GetName());
+
 	ALSCharacter* Character =
 		Cast<ALSCharacter>(OtherActor);
 
 	if (Character && Character->IsAlive())
 	{
-		// Usamos LoseHeart en lugar de FellOutOfWorld
-		// para no depender de que Unreal lo detecte
+		UE_LOG(LogTemp, Warning,
+			TEXT("LoseHeart llamado en: %s"),
+			*Character->GetName());
 		Character->LoseHeart();
 	}
 }

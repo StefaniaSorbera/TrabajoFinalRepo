@@ -1,17 +1,53 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "LSHUDWidget.generated.h"
 
-/**
- * 
- */
+class ULSPlayerHUDWidget;
+
 UCLASS()
 class TRABAJOFINAL_API ULSHUDWidget : public UUserWidget
 {
 	GENERATED_BODY()
+
+public:
+	// --- Referencias a los PlayerHUDs ---
+	// Nombres exactos requeridos en el Designer
+
+	UPROPERTY(meta = (BindWidget))
+	ULSPlayerHUDWidget* Player1HUD;
+
+	UPROPERTY(meta = (BindWidget))
+	ULSPlayerHUDWidget* Player2HUD;
+
+	UPROPERTY(meta = (BindWidget))
+	ULSPlayerHUDWidget* Player3HUD;
+
+	UPROPERTY(meta = (BindWidget))
+	ULSPlayerHUDWidget* Player4HUD;
 	
+	UFUNCTION(BlueprintCallable, Category = "HUD")
+	void SetPlayerSlotVisible(int32 PlayerIdx, bool bVisible);
+
+	// --- Timer ---
+	UPROPERTY(meta = (BindWidget))
+	class UTextBlock* TXT_Timer;
+
+	// --- Funciones llamadas desde PlayerController ---
+
+	UFUNCTION(BlueprintCallable, Category = "HUD")
+	void UpdateMatchTime(float NewTime);
+	
+	UFUNCTION(BlueprintCallable, Category = "HUD")
+	ULSPlayerHUDWidget* GetPlayerHUD(int32 PlayerIdx);
+
+	UFUNCTION(BlueprintCallable, Category = "HUD")
+	void UpdatePlayerHearts(int32 PlayerIdx, int32 HeartsLeft);
+
+	UFUNCTION(BlueprintCallable, Category = "HUD")
+	void UpdatePlayerKills(int32 PlayerIdx, int32 Kills);
+
+	UFUNCTION(BlueprintCallable, Category = "HUD")
+	void EliminatePlayer(int32 PlayerIdx);
 };

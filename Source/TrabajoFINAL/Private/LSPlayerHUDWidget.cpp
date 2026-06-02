@@ -81,6 +81,16 @@ void ULSPlayerHUDWidget::UpdateHeartColor(
 {
 	if (!Heart) return;
 
-	Heart->SetColorAndOpacity(
-		bFull ? HeartFullColor : HeartEmptyColor);
+	if (bFull && HeartFullTexture)
+	{
+		Heart->SetBrushFromTexture(HeartFullTexture);
+	}
+	else if (!bFull && HeartEmptyTexture)
+	{
+		Heart->SetBrushFromTexture(HeartEmptyTexture);
+	}
+
+	// Resetamos el tinte a blanco para que
+	// la textura se vea con sus colores originales
+	Heart->SetColorAndOpacity(FLinearColor::White);
 }

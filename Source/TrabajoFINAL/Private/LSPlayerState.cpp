@@ -1,4 +1,6 @@
 #include "LSPlayerState.h"
+
+#include "LSPlayerController.h"
 #include "Net/UnrealNetwork.h"
 
 ALSPlayerState::ALSPlayerState()
@@ -9,7 +11,8 @@ void ALSPlayerState::GetLifetimeReplicatedProps(
 	TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
+	
+	DOREPLIFETIME(ALSPlayerState, HUDSlotIndex);
 	DOREPLIFETIME(ALSPlayerState, KillCount);
 	DOREPLIFETIME(ALSPlayerState, LivesLeft);
 	DOREPLIFETIME(ALSPlayerState, PlayerStatus);
@@ -17,12 +20,19 @@ void ALSPlayerState::GetLifetimeReplicatedProps(
 
 void ALSPlayerState::AddKill()
 {
-	if (GetLocalRole() == ROLE_Authority)
+	if (GetLocalRole() != ROLE_Authority) return;
+
+	KillCount++;
+
+	// Notificamos al controller del killer
+	ALSPlayerController* PC =
+		Cast<ALSPlayerController>(GetOwningController());
+	if (PC)
 	{
-		KillCount++;
+		int32 PlayerIdx = GetPlayerId() % 4;
+		PC->UpdateHUDKills(PlayerIdx, KillCount);
 	}
 }
-
 void ALSPlayerState::SetPlayerDead()
 {
 	if (GetLocalRole() == ROLE_Authority)

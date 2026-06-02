@@ -13,6 +13,12 @@ public:
 
     // --- Referencias a los widgets del designer ---
     // Se bindean automáticamente por nombre con meta=(BindWidget)
+    
+    UPROPERTY(EditAnywhere, Category = "Hearts")
+    UTexture2D* HeartFullTexture;
+
+    UPROPERTY(EditAnywhere, Category = "Hearts")
+    UTexture2D* HeartEmptyTexture;
 
     UPROPERTY(meta = (BindWidget))
     class UTextBlock* TXT_PlayerName;
@@ -42,7 +48,7 @@ public:
     FLinearColor PlayerColor = FLinearColor::White;
 
     // --- Funciones públicas llamadas desde WBP_HUD ---
-
+    
     UFUNCTION(BlueprintCallable, Category = "HUD")
     void SetPlayerName(const FString& Name);
 
@@ -69,7 +75,7 @@ protected:
 
     // Colores de corazón
     UPROPERTY(EditDefaultsOnly, Category = "HUD")
-    FLinearColor HeartFullColor  = FLinearColor(1.f, 0.1f, 0.3f, 1.f);
+    FLinearColor HeartFullColor  = FLinearColor(1.0f, 1.0f, 1.0f, 1.f);
 
     UPROPERTY(EditDefaultsOnly, Category = "HUD")
     FLinearColor HeartEmptyColor = FLinearColor(0.15f, 0.15f, 0.15f, 0.4f);

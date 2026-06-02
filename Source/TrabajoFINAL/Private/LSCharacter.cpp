@@ -102,7 +102,6 @@ ALSCharacter::ALSCharacter()
         }
     }
 
-
 void ALSCharacter::OnBallOverlap(
     UPrimitiveComponent* OverlappedComp,
     AActor* OtherActor,
@@ -152,13 +151,16 @@ void ALSCharacter::GetLifetimeReplicatedProps(
 
 void ALSCharacter::OnRep_HeartsLeft()
 {
-    // Actualiza los corazones en el HUD del cliente
     ALSPlayerController* PC =
         Cast<ALSPlayerController>(GetController());
-    if (PC && PC->IsLocalController())
-    {
-        PC->BP_UpdateLivesLeft(HeartsLeft);
-    }
+    if (!PC || !PC->IsLocalController()) return;
+
+    // Obtenemos el índice del jugador
+    ALSPlayerState* PS =
+        GetPlayerState<ALSPlayerState>();
+    int32 PlayerIdx = PS ? PS->GetPlayerId() % 4 : 0;
+
+    PC->UpdateHUDHearts(PlayerIdx, HeartsLeft);
 }
 
 void ALSCharacter::OnRep_bIsDead()
@@ -301,17 +303,19 @@ void ALSCharacter::LoseHeart()
         GetController()->GetPlayerState<ALSPlayerState>();
     if (PS) PS->SetLivesLeft(HeartsLeft);
 
+    // RepNotify no se dispara en el servidor
+    // lo llamamos manualmente para el host
+    OnRep_HeartsLeft();
+
     if (HeartsLeft <= 0)
     {
         HandleDeath();
     }
     else
     {
-        // Respawn con delay
         HandleRespawn();
     }
 }
-
 
 
 void ALSCharacter::HandleDeath()
@@ -333,9 +337,22 @@ void ALSCharacter::HandleRespawn()
 {
     if (GetLocalRole() != ROLE_Authority) return;
 
-    // Ocultamos mientras esperamos
     bIsDead = true;
     Multicast_PlayDeathFX();
+
+    ALSPlayerController* PC =
+        Cast<ALSPlayerController>(GetController());
+
+    UE_LOG(LogTemp, Warning,
+        TEXT("HandleRespawn — PC: %s | DeathWidgetClass: %s"),
+        PC ? *PC->GetName() : TEXT("NULL"),
+        PC && PC->DeathWidgetClass ?
+            TEXT("ASIGNADO") : TEXT("NULL"));
+
+    if (PC)
+    {
+        PC->Client_ShowDeathScreen();
+    }
 
     GetWorldTimerManager().SetTimer(
         RespawnHandle,

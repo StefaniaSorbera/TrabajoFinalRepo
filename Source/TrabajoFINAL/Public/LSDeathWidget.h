@@ -11,20 +11,18 @@ class TRABAJOFINAL_API ULSDeathWidget : public UUserWidget
 
 public:
 	UPROPERTY(meta = (BindWidget))
-	class UTextBlock* TXT_Countdown;
-
-	UPROPERTY(meta = (BindWidget))
 	class UTextBlock* TXT_Title;
 
+	UPROPERTY(meta = (BindWidget))
+	class UTextBlock* TXT_Countdown;
+
+	void NativeConstruct();
+	void NativeDestruct();
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void StartRespawnCountdown(float RespawnTime);
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "UI")
 	void OnRespawnReady();
-
-protected:
-	virtual void NativeConstruct() override;
-	virtual void NativeDestruct() override;
 
 private:
 	float RemainingTime = 0.f;
