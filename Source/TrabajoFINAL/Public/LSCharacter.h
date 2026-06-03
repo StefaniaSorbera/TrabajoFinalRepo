@@ -30,6 +30,16 @@ public:
 
     UPROPERTY(EditDefaultsOnly, Category = "Movement")
     float BallGroundFriction = 5.f;
+    
+    // Invencibilidad post-respawn
+    UPROPERTY()
+    bool bIsInvincible = false;
+    
+    UPROPERTY(EditDefaultsOnly, Category = "Combat")
+    float InvincibilityDuration = 2.f;
+    
+    FTimerHandle InvincibilityHandle;
+    
     // --- Estado ---
     UPROPERTY(ReplicatedUsing = OnRep_bIsDead,
         BlueprintReadOnly, Category = "State")

@@ -32,7 +32,8 @@ protected:
 	FTimerHandle MatchTickHandle;
 
 	void RestartMatch();
-
+	
+	FTimerHandle AssignSlotsHandle;
 	FTimerHandle RestartTimerHandle;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Match")

@@ -17,7 +17,6 @@ void ALSGameMode::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Inicializamos GameState
     ALSGameState* GS = GetGameState<ALSGameState>();
     if (GS)
     {
@@ -26,7 +25,7 @@ void ALSGameMode::BeginPlay()
         GS->SetMatchTime(MatchDuration);
     }
 
-    // Timer que descuenta el tiempo cada segundo
+    // Timer del match
     GetWorldTimerManager().SetTimer(
         MatchTickHandle,
         [this]()
@@ -43,8 +42,17 @@ void ALSGameMode::BeginPlay()
                 OnMatchTimeUp();
             }
         },
-        1.f,   // cada 1 segundo
-        true); // loop
+        1.f,
+        true);
+
+    // Asignamos slots con delay para que todos
+    // los PlayerStates estén inicializados
+    GetWorldTimerManager().SetTimer(
+        AssignSlotsHandle,        // <- agregar este handle en .h
+        this,
+        &ALSGameMode::AssignHUDSlots,
+        1.f,
+        false);
 }
 
 void ALSGameMode::PlayerDied(AController* DeadPlayer,
@@ -120,6 +128,7 @@ void ALSGameMode::CheckVictoryCondition()
     }
     // Si quedan 2+ vivos seguimos jugando
 }
+
 void ALSGameMode::AssignHUDSlots()
 {
     int32 SlotIndex = 0;
@@ -136,12 +145,30 @@ void ALSGameMode::AssignHUDSlots()
         if (PS)
         {
             PS->HUDSlotIndex = SlotIndex;
+
+            UE_LOG(LogTemp, Warning,
+                TEXT("Slot asignado: Controller=%s Slot=%d"),
+                *PC->GetName(), SlotIndex);
+
             SlotIndex++;
         }
-
-        // Avisamos a cada cliente que inicialice su HUD
-        PC->Client_InitializeHUD();
     }
+    FTimerHandle NotifyHandle;
+    GetWorldTimerManager().SetTimer(
+        NotifyHandle,
+        [this]()
+        {
+            for (FConstPlayerControllerIterator It =
+                GetWorld()->GetPlayerControllerIterator();
+                It; ++It)
+            {
+                ALSPlayerController* PC =
+                    Cast<ALSPlayerController>(It->Get());
+                if (PC) PC->Client_InitializeHUD();
+            }
+        },
+        0.5f,
+        false);
 }
 void ALSGameMode::EndMatch(AController* Winner)
 {

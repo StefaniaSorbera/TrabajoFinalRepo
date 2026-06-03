@@ -151,34 +151,48 @@ void ALSCharacter::GetLifetimeReplicatedProps(
 
 void ALSCharacter::OnRep_HeartsLeft()
 {
-    ALSPlayerController* PC =
-        Cast<ALSPlayerController>(GetController());
-    if (!PC || !PC->IsLocalController()) return;
+    // Obtenemos el slot del jugador dueño de este Character
+    ALSPlayerState* PS = GetPlayerState<ALSPlayerState>();
+    if (!PS) return;
 
-    // Obtenemos el índice del jugador
-    ALSPlayerState* PS =
-        GetPlayerState<ALSPlayerState>();
-    int32 PlayerIdx = PS ? PS->GetPlayerId() % 4 : 0;
+    int32 PlayerIdx = PS->HUDSlotIndex;
 
-    PC->UpdateHUDHearts(PlayerIdx, HeartsLeft);
+    // Buscamos el controller local del cliente
+    // (puede ser cualquier jugador, no necesariamente el dueño)
+    for (FConstPlayerControllerIterator It =
+        GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    {
+        ALSPlayerController* PC =
+            Cast<ALSPlayerController>(It->Get());
+
+        // IsLocalPlayerController verifica que sea
+        // el controller que corre en ESTE cliente
+        if (PC && PC->IsLocalPlayerController())
+        {
+            PC->UpdateHUDHearts(PlayerIdx, HeartsLeft);
+            break;
+        }
+    }
 }
 
 void ALSCharacter::OnRep_bIsDead()
 {
     if (bIsDead)
     {
-        // Efectos visuales de muerte en el cliente
-        GetMesh()->SetVisibility(false);
-        GetCapsuleComponent()->SetCollisionEnabled(
+        BallMesh->SetVisibility(false);
+        BallCollision->SetCollisionEnabled(
             ECollisionEnabled::NoCollision);
     }
     else
     {
-        // Volvió a aparecer
-        GetMesh()->SetVisibility(true);
-        GetCapsuleComponent()->SetCollisionEnabled(
-            ECollisionEnabled::QueryAndPhysics);
+        BallMesh->SetVisibility(true);
+        BallCollision->SetCollisionEnabled(
+            ECollisionEnabled::QueryOnly);
     }
+
+    // Nos aseguramos que el SkeletalMesh
+    // del template SIEMPRE esté oculto
+    GetMesh()->SetVisibility(false);
 }
 
 void ALSCharacter::Tick(float DeltaTime)
@@ -295,17 +309,29 @@ void ALSCharacter::FellOutOfWorld(const UDamageType& DmgType)
 void ALSCharacter::LoseHeart()
 {
     if (GetLocalRole() != ROLE_Authority) return;
+    if (bIsInvincible) return;
 
     HeartsLeft = FMath::Max(0, HeartsLeft - 1);
 
-    // Actualizamos PlayerState
     ALSPlayerState* PS =
         GetController()->GetPlayerState<ALSPlayerState>();
     if (PS) PS->SetLivesLeft(HeartsLeft);
 
-    // RepNotify no se dispara en el servidor
-    // lo llamamos manualmente para el host
-    OnRep_HeartsLeft();
+    // Llamamos manualmente para el servidor/host
+    // pasamos el índice correcto
+    int32 PlayerIdx = PS ? PS->HUDSlotIndex : 0;
+
+    // Actualizamos en todos los controllers locales
+    for (FConstPlayerControllerIterator It =
+        GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    {
+        ALSPlayerController* PC =
+            Cast<ALSPlayerController>(It->Get());
+        if (PC && PC->IsLocalController())
+        {
+            PC->UpdateHUDHearts(PlayerIdx, HeartsLeft);
+        }
+    }
 
     if (HeartsLeft <= 0)
     {
@@ -366,18 +392,18 @@ void ALSCharacter::DoRespawn()
 {
     if (GetLocalRole() != ROLE_Authority) return;
 
-    // Buscamos todos los respawn points del nivel
+    // Buscamos respawn point
     TArray<AActor*> RespawnPoints;
     UGameplayStatics::GetAllActorsOfClass(
         GetWorld(),
         ALSRespawnPoint::StaticClass(),
         RespawnPoints);
 
-    FVector SpawnLocation = GetActorLocation(); // fallback
+    FVector SpawnLocation = FVector(0.f, 0.f, 300.f);
 
     if (RespawnPoints.Num() > 0)
     {
-        // Elegimos uno al azar
+    
         int32 RandomIndex = FMath::RandRange(
             0, RespawnPoints.Num() - 1);
 
@@ -388,22 +414,28 @@ void ALSCharacter::DoRespawn()
         {
             SpawnLocation = ChosenPoint->GetSpawnLocation();
         }
-        // Marcamos al jugador como vivo en el PlayerState
-        ALSPlayerState* PS =
-            GetController()->GetPlayerState<ALSPlayerState>();
-        if (PS) PS->SetPlayerAlive(); // <- agregar esto
-
-        GetCharacterMovement()->StopMovementImmediately();
-        bIsDead = false;
-        Multicast_PlayRespawnFX();
     }
 
+    // Teletransportamos ANTES de quitar la invencibilidad
     SetActorLocation(SpawnLocation);
     GetCharacterMovement()->StopMovementImmediately();
+
     bIsDead = false;
+
+    // Activamos invencibilidad temporal
+    bIsInvincible = true;
+    GetWorldTimerManager().SetTimer(
+        InvincibilityHandle,
+        [this]()
+        {
+            bIsInvincible = false;
+        },
+        InvincibilityDuration,
+        false);
+
     Multicast_PlayRespawnFX();
 
-    // Restauramos la cámara del nivel
+    // Restauramos cámara
     APlayerController* PC =
         Cast<APlayerController>(GetController());
     if (PC)
@@ -425,24 +457,28 @@ void ALSCharacter::DoRespawn()
 
 void ALSCharacter::Multicast_PlayDeathFX_Implementation()
 {
-    // Ocultamos la pelota
     BallMesh->SetVisibility(false);
     BallCollision->SetCollisionEnabled(
         ECollisionEnabled::NoCollision);
     GetCapsuleComponent()->SetCollisionEnabled(
         ECollisionEnabled::NoCollision);
     GetCharacterMovement()->DisableMovement();
+
+    // Siempre oculto
+    GetMesh()->SetVisibility(false);
 }
 
 void ALSCharacter::Multicast_PlayRespawnFX_Implementation()
 {
-    // Mostramos la pelota de nuevo
     BallMesh->SetVisibility(true);
     BallCollision->SetCollisionEnabled(
         ECollisionEnabled::QueryOnly);
     GetCapsuleComponent()->SetCollisionEnabled(
         ECollisionEnabled::QueryAndPhysics);
     GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+
+    // Siempre oculto
+    GetMesh()->SetVisibility(false);
 }
 
 void ALSCharacter::Multicast_PlayDashFX_Implementation()

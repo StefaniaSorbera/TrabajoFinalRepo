@@ -4,6 +4,7 @@
 #include "LSEndGameWidget.h"
 #include "LSDeathWidget.h"
 #include "LSPlayerState.h"
+#include "GameFramework/GameStateBase.h"
 
 class ALSPlayerState;
 
@@ -54,22 +55,23 @@ void ALSPlayerController::InitializeHUD()
 		TEXT("Jugador 4")
 	};
 
-	// Iteramos solo los jugadores conectados
-	for (FConstPlayerControllerIterator It =
-		GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	// Usamos GameState en lugar de PlayerControllerIterator
+	// porque el cliente no ve todos los controllers
+	AGameStateBase* GS = GetWorld()->GetGameState();
+	if (!GS) return;
+	
+		for (APlayerState* PS : GS->PlayerArray)
 	{
-		ALSPlayerController* PC =
-			Cast<ALSPlayerController>(It->Get());
-		if (!PC) continue;
+		ALSPlayerState* LSPS = Cast<ALSPlayerState>(PS);
+		if (!LSPS) continue;
 
-		ALSPlayerState* PS =
-			PC->GetPlayerState<ALSPlayerState>();
-		if (!PS) continue;
+		UE_LOG(LogTemp, Warning,
+			TEXT("InitializeHUD — Player=%s Slot=%d"),
+			*LSPS->GetPlayerName(), LSPS->HUDSlotIndex);
 
-		int32 Idx = PS->HUDSlotIndex;
+		int32 Idx = LSPS->HUDSlotIndex;
 		if (Idx < 0 || Idx >= 4) continue;
 
-		// Mostramos y configuramos solo los conectados
 		HUDWidget->SetPlayerSlotVisible(Idx, true);
 
 		ULSPlayerHUDWidget* PlayerHUD =
@@ -80,10 +82,12 @@ void ALSPlayerController::InitializeHUD()
 				Idx,
 				PlayerNames[Idx],
 				PlayerColors[Idx]);
+
+			// Inicializamos con los corazones actuales
+			PlayerHUD->SetHearts(LSPS->LivesLeft);
 		}
 	}
 }
-
 void ALSPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
