@@ -46,6 +46,8 @@ public:
 	// El GameMode llama esto cuando muere un jugador
 	void DecrementPlayersAlive();
 
+	virtual void AddPlayerState(APlayerState* PlayerState) override;
+	
 	// El GameMode llama esto para cambiar el estado
 	void SetMatchState(EMatchState NewState);
 

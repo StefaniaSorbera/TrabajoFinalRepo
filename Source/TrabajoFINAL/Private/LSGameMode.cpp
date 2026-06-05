@@ -55,8 +55,20 @@ void ALSGameMode::BeginPlay()
         false);
 }
 
+void ALSGameMode::PostLogin(APlayerController* NewPlayer)
+{
+    Super::PostLogin(NewPlayer);
+    // Reasignamos todos los slots cada vez que entra un jugador
+    // con un pequeño delay para que el PlayerState esté inicializado
+    FTimerHandle Handle;
+    GetWorldTimerManager().SetTimer(Handle, [this]()
+    {
+        AssignHUDSlots();
+    }, 0.3f, false);
+}
+
 void ALSGameMode::PlayerDied(AController* DeadPlayer,
-                              AController* Killer)
+                             AController* Killer)
 {
     if (!HasAuthority()) return;
 

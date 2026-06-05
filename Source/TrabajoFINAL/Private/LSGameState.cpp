@@ -4,6 +4,8 @@
 #include "LSGameState.h"
 
 #include "LSPlayerController.h"
+#include "LSPlayerState.h"
+#include "LSPlayerController.h"
 #include "Net/UnrealNetwork.h"
 
 ALSGameState::ALSGameState()
@@ -22,6 +24,30 @@ void ALSGameState::GetLifetimeReplicatedProps(
 	DOREPLIFETIME(ALSGameState, PlayersAlive);
 }
 
+
+void ALSGameState::AddPlayerState(APlayerState* PlayerState)
+{
+	Super::AddPlayerState(PlayerState);
+
+	// Se llama en servidor Y en clientes cuando llega un nuevo PlayerState
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		ALSPlayerController* PC = Cast<ALSPlayerController>(It->Get());
+		if (PC && PC->IsLocalController())
+		{
+			// Esperamos un frame para que HUDSlotIndex esté replicado
+			FTimerHandle Handle;
+			World->GetTimerManager().SetTimer(Handle, [PC]()
+			{
+				PC->InitializeHUD();
+			}, 0.2f, false);
+			break;
+		}
+	}
+}
 void ALSGameState::DecrementPlayersAlive()
 {
 	if (GetLocalRole() == ROLE_Authority)

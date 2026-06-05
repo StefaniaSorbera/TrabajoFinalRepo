@@ -18,7 +18,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
-
+	virtual void PostLogin(APlayerController* NewPlayer) override;
 	void CheckVictoryCondition();
 	void AssignHUDSlots();
 	void EndMatch(AController* Winner);

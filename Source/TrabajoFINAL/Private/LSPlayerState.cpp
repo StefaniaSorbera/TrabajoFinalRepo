@@ -18,6 +18,43 @@ void ALSPlayerState::GetLifetimeReplicatedProps(
 	DOREPLIFETIME(ALSPlayerState, PlayerStatus);
 }
 
+void ALSPlayerState::OnRep_LivesLeft()
+{
+	// Recorre TODOS los controllers locales y actualiza el slot correcto
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		ALSPlayerController* PC = Cast<ALSPlayerController>(It->Get());
+		// Solo actualizamos el controller LOCAL de esta máquina
+		if (PC && PC->IsLocalController())
+		{
+			PC->UpdateHUDHearts(HUDSlotIndex, LivesLeft);
+			break;
+		}
+	}
+}
+
+void ALSPlayerState::OnRep_HUDSlotIndex()
+{
+	if (HUDSlotIndex < 0) return;
+
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	// Buscar el controller local y decirle que reinicialice el HUD
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		ALSPlayerController* PC = Cast<ALSPlayerController>(It->Get());
+		if (PC && PC->IsLocalController())
+		{
+			PC->InitializeHUD();
+			break;
+		}
+	}
+}
+
 void ALSPlayerState::AddKill()
 {
 	if (GetLocalRole() != ROLE_Authority) return;

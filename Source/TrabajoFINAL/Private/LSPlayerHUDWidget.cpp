@@ -76,21 +76,20 @@ void ULSPlayerHUDWidget::SetEliminated()
 	}
 }
 
-void ULSPlayerHUDWidget::UpdateHeartColor(
-	UImage* Heart, bool bFull)
+void ULSPlayerHUDWidget::UpdateHeartColor(UImage* Heart, bool bFull)
 {
 	if (!Heart) return;
 
 	if (bFull && HeartFullTexture)
 	{
 		Heart->SetBrushFromTexture(HeartFullTexture);
+		// Corazón lleno: usa el color del jugador
+		Heart->SetColorAndOpacity(PlayerColor);
 	}
 	else if (!bFull && HeartEmptyTexture)
 	{
 		Heart->SetBrushFromTexture(HeartEmptyTexture);
+		// Corazón vacío: gris oscuro sin importar el jugador
+		Heart->SetColorAndOpacity(HeartEmptyColor);
 	}
-
-	// Resetamos el tinte a blanco para que
-	// la textura se vea con sus colores originales
-	Heart->SetColorAndOpacity(FLinearColor::White);
 }

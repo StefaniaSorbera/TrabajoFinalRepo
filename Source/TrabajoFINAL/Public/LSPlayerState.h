@@ -26,11 +26,18 @@ public:
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Player")
 	int32 KillCount = 0;
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Player")
-	int32 HUDSlotIndex =-1;
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Player")
+	// Por esto:
+	UPROPERTY(ReplicatedUsing = OnRep_HUDSlotIndex, BlueprintReadOnly, Category = "Player")
+	int32 HUDSlotIndex = -1;
+	UPROPERTY(ReplicatedUsing = OnRep_LivesLeft, BlueprintReadOnly, Category = "Player")
 	int32 LivesLeft = 3;
 
+	UFUNCTION()
+	void OnRep_LivesLeft();
+
+	UFUNCTION()
+	void OnRep_HUDSlotIndex();
+	
 	// RepNotify — cuando cambia el estado notificamos al HUD
 	UPROPERTY(ReplicatedUsing = OnRep_PlayerStatus, BlueprintReadOnly, Category = "Player")
 	EPlayerStatus PlayerStatus = EPlayerStatus::Alive;

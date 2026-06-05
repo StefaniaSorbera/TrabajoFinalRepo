@@ -23,6 +23,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "HUD")
     void UpdateHUDKills(int32 PlayerIdx, int32 Kills);
 
+
+    UFUNCTION(Client, Reliable)
+    void Client_UpdatePlayerHearts(int32 SlotIndex, int32 HeartsLeft);
+    
     UFUNCTION(BlueprintCallable, Category = "HUD")
     void UpdateHUDTimer(float NewTime);
     // --- Client RPCs ---
@@ -66,10 +70,11 @@ public:
     UFUNCTION(BlueprintImplementableEvent, Category = "HUD")
     void BP_StartRestartCountdown(float Seconds);
 
+    void InitializeHUD();
+
 protected:
     virtual void BeginPlay() override;
     virtual void SetupInputComponent() override;
-    void InitializeHUD();
 
     // --- Widgets ---
     UPROPERTY(BlueprintReadOnly, Category = "HUD")

@@ -30,12 +30,10 @@ void ALSPlayerController::BeginPlay()
 		// ahora lo llama el servidor via Client_InitializeHUD
 	}
 }
-
 void ALSPlayerController::InitializeHUD()
 {
 	if (!HUDWidget) return;
 
-	// Ocultamos todos los slots primero
 	for (int32 i = 0; i < 4; i++)
 	{
 		HUDWidget->SetPlayerSlotVisible(i, false);
@@ -44,8 +42,8 @@ void ALSPlayerController::InitializeHUD()
 	TArray<FLinearColor> PlayerColors = {
 		FLinearColor(0.1f, 0.4f, 0.9f, 1.f),
 		FLinearColor(0.9f, 0.2f, 0.1f, 1.f),
-		FLinearColor(0.95f, 0.7f, 0.1f, 1.f),
-		FLinearColor(0.6f, 0.2f, 0.9f, 1.f)
+		FLinearColor(0.13f, 0.99f, 0.1f, 1.f),
+		FLinearColor(0.95f, 0.1f, 0.9f, 1.f)
 	};
 
 	TArray<FString> PlayerNames = {
@@ -55,35 +53,33 @@ void ALSPlayerController::InitializeHUD()
 		TEXT("Jugador 4")
 	};
 
-	// Usamos GameState en lugar de PlayerControllerIterator
-	// porque el cliente no ve todos los controllers
 	AGameStateBase* GS = GetWorld()->GetGameState();
 	if (!GS) return;
-	
-		for (APlayerState* PS : GS->PlayerArray)
+
+	// ===== LOGS DE DIAGNÓSTICO =====
+	UE_LOG(LogTemp, Warning, TEXT("=== InitializeHUD | Controller=%s | PlayerArray=%d ==="),
+		*GetName(), GS->PlayerArray.Num());
+	// ================================
+
+	for (APlayerState* PS : GS->PlayerArray)
 	{
 		ALSPlayerState* LSPS = Cast<ALSPlayerState>(PS);
 		if (!LSPS) continue;
 
-		UE_LOG(LogTemp, Warning,
-			TEXT("InitializeHUD — Player=%s Slot=%d"),
-			*LSPS->GetPlayerName(), LSPS->HUDSlotIndex);
+		// ===== LOG POR CADA JUGADOR =====
+		UE_LOG(LogTemp, Warning, TEXT("  >> Player=%s | Slot=%d | Lives=%d"),
+			*LSPS->GetPlayerName(), LSPS->HUDSlotIndex, LSPS->LivesLeft);
+		// ================================
 
 		int32 Idx = LSPS->HUDSlotIndex;
 		if (Idx < 0 || Idx >= 4) continue;
 
 		HUDWidget->SetPlayerSlotVisible(Idx, true);
 
-		ULSPlayerHUDWidget* PlayerHUD =
-			HUDWidget->GetPlayerHUD(Idx);
+		ULSPlayerHUDWidget* PlayerHUD = HUDWidget->GetPlayerHUD(Idx);
 		if (PlayerHUD)
 		{
-			PlayerHUD->InitPlayer(
-				Idx,
-				PlayerNames[Idx],
-				PlayerColors[Idx]);
-
-			// Inicializamos con los corazones actuales
+			PlayerHUD->InitPlayer(Idx, PlayerNames[Idx], PlayerColors[Idx]);
 			PlayerHUD->SetHearts(LSPS->LivesLeft);
 		}
 	}
@@ -159,6 +155,10 @@ void ALSPlayerController::UpdateHUDKills(
 	{
 		HUDWidget->UpdatePlayerKills(PlayerIdx, Kills);
 	}
+}
+
+void ALSPlayerController::Client_UpdatePlayerHearts_Implementation(int32 SlotIndex, int32 HeartsLeft)
+{
 }
 
 void ALSPlayerController::UpdateHUDTimer(float NewTime)
