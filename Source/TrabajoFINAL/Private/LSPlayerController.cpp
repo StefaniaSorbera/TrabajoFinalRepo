@@ -93,13 +93,15 @@ void ALSPlayerController::SetupInputComponent()
 
 void ALSPlayerController::Client_InitializeHUD_Implementation()
 {
+	if (bHUDInitialized) return;
+	bHUDInitialized = true;
+
 	if (HUDWidget)
 	{
 		InitializeHUD();
 	}
 	else
 	{
-		// Si el HUD todavía no se creó esperamos un poco
 		FTimerHandle InitHandle;
 		GetWorldTimerManager().SetTimer(
 			InitHandle,

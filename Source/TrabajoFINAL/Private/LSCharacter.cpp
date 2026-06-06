@@ -392,62 +392,80 @@ void ALSCharacter::DoRespawn()
 {
     if (GetLocalRole() != ROLE_Authority) return;
 
-    // Buscamos respawn point
-    TArray<AActor*> RespawnPoints;
+    ALSPlayerState* PS =
+        GetController()->GetPlayerState<ALSPlayerState>();
+    int32 SlotIndex = PS ? PS->HUDSlotIndex : 0;
+
+    UE_LOG(LogTemp, Warning,
+        TEXT("DoRespawn — Player=%s SlotIndex=%d"),
+        PS ? *PS->GetPlayerName() : TEXT("NULL"),
+        SlotIndex);
+
+    FString SpawnTag = FString::Printf(TEXT("Spawn%d"), SlotIndex);
+
+    TArray<AActor*> SpawnPoints;
     UGameplayStatics::GetAllActorsOfClass(
         GetWorld(),
-        ALSRespawnPoint::StaticClass(),
-        RespawnPoints);
+        APlayerStart::StaticClass(),
+        SpawnPoints);
 
     FVector SpawnLocation = FVector(0.f, 0.f, 300.f);
+    bool bFoundSpawn = false;
 
-    if (RespawnPoints.Num() > 0)
+    for (AActor* SpawnPoint : SpawnPoints)
     {
-    
-        int32 RandomIndex = FMath::RandRange(
-            0, RespawnPoints.Num() - 1);
+        UE_LOG(LogTemp, Warning,
+            TEXT("SpawnPoint encontrado: %s — Tags: %d"),
+            *SpawnPoint->GetName(),
+            SpawnPoint->Tags.Num());
 
-        ALSRespawnPoint* ChosenPoint =
-            Cast<ALSRespawnPoint>(RespawnPoints[RandomIndex]);
-
-        if (ChosenPoint)
+        for (FName Tag : SpawnPoint->Tags)
         {
-            SpawnLocation = ChosenPoint->GetSpawnLocation();
+            UE_LOG(LogTemp, Warning,
+                TEXT("  Tag: %s"), *Tag.ToString());
+        }
+
+        if (SpawnPoint->ActorHasTag(FName(*SpawnTag)))
+        {
+            SpawnLocation =
+                SpawnPoint->GetActorLocation() +
+                FVector(0.f, 0.f, 100.f);
+            bFoundSpawn = true;
+
+            UE_LOG(LogTemp, Warning,
+                TEXT("Spawn encontrado: %s para Slot %d"),
+                *SpawnPoint->GetName(), SlotIndex);
+            break;
         }
     }
 
-    // Teletransportamos ANTES de quitar la invencibilidad
+    if (!bFoundSpawn)
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("NO se encontró spawn para tag: %s"),
+            *SpawnTag);
+    }
+
+    // resto del código igual...
     SetActorLocation(SpawnLocation);
     GetCharacterMovement()->StopMovementImmediately();
-
     bIsDead = false;
-
-    // Activamos invencibilidad temporal
     bIsInvincible = true;
     GetWorldTimerManager().SetTimer(
         InvincibilityHandle,
-        [this]()
-        {
-            bIsInvincible = false;
-        },
-        InvincibilityDuration,
-        false);
-
+        [this]() { bIsInvincible = false; },
+        InvincibilityDuration, false);
     Multicast_PlayRespawnFX();
 
-    // Restauramos cámara
     APlayerController* PC =
         Cast<APlayerController>(GetController());
     if (PC)
     {
-        ACameraActor* LevelCam =
-            Cast<ACameraActor>(
-                UGameplayStatics::GetActorOfClass(
-                    GetWorld(), ACameraActor::StaticClass()));
+        ACameraActor* LevelCam = Cast<ACameraActor>(
+            UGameplayStatics::GetActorOfClass(
+                GetWorld(), ACameraActor::StaticClass()));
         if (LevelCam)
-        {
             PC->SetViewTargetWithBlend(LevelCam, 0.f);
-        }
     }
 }
 

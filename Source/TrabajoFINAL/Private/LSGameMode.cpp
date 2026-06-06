@@ -4,6 +4,8 @@
 #include "LSPlayerController.h"
 #include "LSCharacter.h"
 #include "EngineUtils.h"
+#include "GameFramework/PlayerStart.h"
+#include "Kismet/GameplayStatics.h"
 
 ALSGameMode::ALSGameMode()
 {
@@ -12,7 +14,34 @@ ALSGameMode::ALSGameMode()
     PlayerControllerClass = ALSPlayerController::StaticClass();
     DefaultPawnClass      = ALSCharacter::StaticClass();
 }
+// En LSGameMode.cpp:
+AActor* ALSGameMode::FindPlayerStart_Implementation(
+    AController* Player, const FString& IncomingName)
+{
+    ALSPlayerState* PS =
+        Player->GetPlayerState<ALSPlayerState>();
+    int32 SlotIndex = PS ? PS->HUDSlotIndex : 0;
 
+    FString SpawnTag =
+        FString::Printf(TEXT("Spawn%d"), SlotIndex);
+
+    TArray<AActor*> SpawnPoints;
+    UGameplayStatics::GetAllActorsOfClass(
+        GetWorld(),
+        APlayerStart::StaticClass(),
+        SpawnPoints);
+
+    for (AActor* SpawnPoint : SpawnPoints)
+    {
+        if (SpawnPoint->ActorHasTag(FName(*SpawnTag)))
+        {
+            return SpawnPoint;
+        }
+    }
+
+    return Super::FindPlayerStart_Implementation(
+        Player, IncomingName);
+}
 void ALSGameMode::BeginPlay()
 {
     Super::BeginPlay();

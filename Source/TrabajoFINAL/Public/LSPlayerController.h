@@ -23,7 +23,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "HUD")
     void UpdateHUDKills(int32 PlayerIdx, int32 Kills);
 
-
+    bool bHUDInitialized = false;
+    
     UFUNCTION(Client, Reliable)
     void Client_UpdatePlayerHearts(int32 SlotIndex, int32 HeartsLeft);
     
