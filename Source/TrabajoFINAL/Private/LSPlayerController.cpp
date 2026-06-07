@@ -4,7 +4,9 @@
 #include "LSEndGameWidget.h"
 #include "LSDeathWidget.h"
 #include "LSPlayerState.h"
+#include "Camera/CameraActor.h"
 #include "GameFramework/GameStateBase.h"
+#include "Kismet/GameplayStatics.h"
 
 class ALSPlayerState;
 
@@ -14,9 +16,25 @@ ALSPlayerController::ALSPlayerController()
 void ALSPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	bAutoManageActiveCameraTarget = false;  // <- primero esto
 
 	if (IsLocalController())
 	{
+		FTimerHandle CamHandle;
+		GetWorldTimerManager().SetTimer(CamHandle, [this]()
+		{
+			TArray<AActor*> Cams;
+			UGameplayStatics::GetAllActorsWithTag(
+				GetWorld(), FName("LevelCamera"), Cams);
+			if (Cams.Num() > 0)
+			{
+				ACameraActor* LevelCam =
+					Cast<ACameraActor>(Cams[0]);
+				if (LevelCam)
+					SetViewTargetWithBlend(LevelCam, 0.f);
+			}
+		}, 0.5f, false);
+		
 		if (HUDWidgetClass)
 		{
 			HUDWidget = CreateWidget<ULSHUDWidget>(

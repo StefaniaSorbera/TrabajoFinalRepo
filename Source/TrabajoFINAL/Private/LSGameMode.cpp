@@ -4,6 +4,7 @@
 #include "LSPlayerController.h"
 #include "LSCharacter.h"
 #include "EngineUtils.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -215,11 +216,9 @@ void ALSGameMode::EndMatch(AController* Winner)
 {
     GetWorldTimerManager().ClearTimer(MatchTickHandle);
 
-    // Actualizamos GameState
     ALSGameState* GS = GetGameState<ALSGameState>();
     if (GS) GS->SetMatchState(EMatchState::PostGame);
 
-    // Congelamos todos los personajes y mostramos pantalla
     for (FConstPlayerControllerIterator It =
         GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
@@ -227,29 +226,36 @@ void ALSGameMode::EndMatch(AController* Winner)
             Cast<ALSPlayerController>(It->Get());
         if (!PC) continue;
 
-        // Desactivamos input de todos
+        // Congelamos input
         PC->SetIgnoreMoveInput(true);
         PC->SetIgnoreLookInput(true);
 
-        // Mostramos pantalla según resultado
+        // Congelamos el pawn físicamente
+        if (APawn* Pawn = PC->GetPawn())
+        {
+            if (ALSCharacter* Char = Cast<ALSCharacter>(Pawn))
+            {
+                Char->GetCharacterMovement()->StopMovementImmediately();
+                Char->GetCharacterMovement()->DisableMovement();
+                Char->GetCharacterMovement()->StopMovementImmediately();
+                Char->GetCharacterMovement()->DisableMovement();
+                Char->GetCharacterMovement()->GravityScale = 0.f; // <- evita la caída
+                Char->SetActorEnableCollision(false); // opcional: evita que otros lo empujen
+            }
+        }
+
         if (PC == Winner)
-        {
             PC->Client_ShowVictory();
-        }
         else
-        {
             PC->Client_ShowDefeat();
-        }
+
         PC->Client_StartRestartCountdown(RestartDelay);
     }
 
-    // Countdown para reiniciar — 5 segundos
     GetWorldTimerManager().SetTimer(
-        RestartTimerHandle,
-        this,
+        RestartTimerHandle, this,
         &ALSGameMode::RestartMatch,
-        5.f,
-        false);
+        5.f, false);
 }
 void ALSGameMode::RestartMatch()
 {
