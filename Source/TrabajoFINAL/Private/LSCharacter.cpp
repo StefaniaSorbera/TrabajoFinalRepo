@@ -136,7 +136,7 @@ void ALSCharacter::OnBallOverlap(
 
         // Predicción local del rebote propio
         GetCharacterMovement()->AddImpulse(
-            -KnockDir * (ImpulseScale * 0.4f) + FVector(0.f, 0.f, 200.f), true);
+     FVector(-KnockDir.X, -KnockDir.Y, 0.f) * (ImpulseScale * 0.4f), true);
     }
 }
 
@@ -282,7 +282,7 @@ void ALSCharacter::Server_Dash_Implementation()
                  GetActorLocation()).GetSafeNormal();
 
             OtherChar->GetCharacterMovement()->AddImpulse(
-                KnockDir * KnockbackStrength, true);
+    FVector(KnockDir.X, KnockDir.Y, 0.f) * KnockbackStrength, true);
         }
     }
 
