@@ -168,6 +168,14 @@ void ALSPlayerController::UpdateHUDHearts(
 	}
 }
 
+void ALSPlayerController::UpdateHUDPlayersAlive(int32 PlayersAlive)
+{
+	if (HUDWidget)
+	{
+		HUDWidget->UpdatePlayersAlive(PlayersAlive);
+	}
+}
+
 void ALSPlayerController::UpdateHUDKills(
 	int32 PlayerIdx, int32 Kills)
 {

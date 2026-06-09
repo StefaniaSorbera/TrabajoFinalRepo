@@ -29,6 +29,13 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "HUD")
 	void SetPlayerSlotVisible(int32 PlayerIdx, bool bVisible);
+	
+	// Jugadores vivos
+	UPROPERTY(meta = (BindWidget))
+	class UTextBlock* TXT_PlayersAlive;
+
+	UFUNCTION(BlueprintCallable, Category = "HUD")
+	void UpdatePlayersAlive(int32 PlayersAlive);
 
 	// --- Timer ---
 	UPROPERTY(meta = (BindWidget))

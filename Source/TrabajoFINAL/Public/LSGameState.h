@@ -29,14 +29,20 @@ public:
 	// Tiempo restante — con RepNotify (actualiza el HUD automáticamente)
 	UPROPERTY(ReplicatedUsing = OnRep_MatchTime, BlueprintReadOnly, Category = "Match")
 	float MatchTime = 0.f;
-
+	
+	UPROPERTY(Replicated, EditDefaultsOnly, Category = "Players")
+	TArray<UMaterialInterface*> PlayerMaterials;
 	// Estado actual de la partida
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Match")
 	EMatchState MatchState = EMatchState::WaitingToStart;
 
 	// Cantidad de jugadores vivos
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Match")
+	UPROPERTY(ReplicatedUsing = OnRep_PlayersAlive,
+	BlueprintReadOnly, Category = "Match")
 	int32 PlayersAlive = 0;
+	UFUNCTION()
+	
+	void OnRep_PlayersAlive();
 
 	// --- Funciones ---
 
@@ -45,6 +51,9 @@ public:
 
 	// El GameMode llama esto cuando muere un jugador
 	void DecrementPlayersAlive();
+	
+	UFUNCTION(BlueprintCallable)
+	void SetPlayersAlive(int32 NewCount);
 
 	virtual void AddPlayerState(APlayerState* PlayerState) override;
 	

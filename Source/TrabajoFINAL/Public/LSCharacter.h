@@ -83,7 +83,21 @@ public:
     // Mesh visual de la pelota
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ball")
     UStaticMeshComponent* BallMesh;
+    
+    UPROPERTY(ReplicatedUsing = OnRep_PlayerColor, BlueprintReadOnly, Category = "Ball")
+    FLinearColor PlayerColor = FLinearColor::White;
+    
+    UPROPERTY(ReplicatedUsing = OnRep_PlayerMaterial)
+    int32 MaterialSlotIndex = -1;
 
+    UFUNCTION()
+    void OnRep_PlayerMaterial();
+
+    void ApplyPlayerMaterial();
+    UFUNCTION()
+    void OnRep_PlayerColor();
+
+    void ApplyPlayerColor();
     // Colisión de rebote entre jugadores
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ball")
     USphereComponent* BallCollision;

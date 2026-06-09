@@ -24,6 +24,8 @@ protected:
 		const FString& IncomingName) override;
 	void CheckVictoryCondition();
 	void AssignHUDSlots();
+	UPROPERTY(EditDefaultsOnly, Category = "Players")
+	TArray<UMaterialInterface*> PlayerMaterials;
 	void EndMatch(AController* Winner);
 	void OnMatchTimeUp();
 

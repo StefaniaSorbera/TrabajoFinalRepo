@@ -85,6 +85,7 @@ void ALSGameMode::BeginPlay()
         false);
 }
 
+
 void ALSGameMode::PostLogin(APlayerController* NewPlayer)
 {
     Super::PostLogin(NewPlayer);
@@ -188,13 +189,33 @@ void ALSGameMode::AssignHUDSlots()
         {
             PS->HUDSlotIndex = SlotIndex;
 
-            UE_LOG(LogTemp, Warning,
-                TEXT("Slot asignado: Controller=%s Slot=%d"),
-                *PC->GetName(), SlotIndex);
+            // Asignamos material según slot
+            if (PlayerMaterials.IsValidIndex(SlotIndex))
+            {
+                ALSCharacter* Char = Cast<ALSCharacter>(PC->GetPawn());
+                UE_LOG(LogTemp, Warning, TEXT("Pawn: %s, Char valid: %s, SlotIndex: %d"),
+                    *PC->GetName(),
+                    Char ? TEXT("SI") : TEXT("NO"),
+                    SlotIndex);
+
+                if (Char)
+                {
+                    Char->MaterialSlotIndex = SlotIndex;
+                    Char->ApplyPlayerMaterial();
+                    UE_LOG(LogTemp, Warning, TEXT("Material seteado en servidor para slot %d"), SlotIndex);
+                }
+            }
 
             SlotIndex++;
         }
     }
+    
+    ALSGameState* GS = GetGameState<ALSGameState>();
+    if (GS)
+    {
+        GS->SetPlayersAlive(SlotIndex); // SlotIndex al final == cantidad real de jugadores
+    }
+    
     FTimerHandle NotifyHandle;
     GetWorldTimerManager().SetTimer(
         NotifyHandle,

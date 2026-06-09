@@ -22,8 +22,17 @@ void ALSGameState::GetLifetimeReplicatedProps(
 	DOREPLIFETIME(ALSGameState, MatchTime);
 	DOREPLIFETIME(ALSGameState, MatchState);
 	DOREPLIFETIME(ALSGameState, PlayersAlive);
+	DOREPLIFETIME(ALSGameState, PlayerMaterials);
 }
 
+void ALSGameState::SetPlayersAlive(int32 NewCount)
+{
+	if (GetLocalRole() == ROLE_Authority)
+	{
+		PlayersAlive = NewCount;
+		OnRep_PlayersAlive(); // Para que el servidor también actualice su HUD
+	}
+}
 
 void ALSGameState::AddPlayerState(APlayerState* PlayerState)
 {
@@ -53,6 +62,9 @@ void ALSGameState::DecrementPlayersAlive()
 	if (GetLocalRole() == ROLE_Authority)
 	{
 		PlayersAlive = FMath::Max(0, PlayersAlive - 1);
+
+		// Manual para el servidor igual que MatchTime
+		OnRep_PlayersAlive();
 	}
 }
 
@@ -87,6 +99,21 @@ void ALSGameState::OnRep_MatchTime()
 		if (PC && PC->IsLocalController())
 		{
 			PC->UpdateHUDTimer(MatchTime);
+			break;
+		}
+	}
+}
+
+void ALSGameState::OnRep_PlayersAlive()
+{
+	for (FConstPlayerControllerIterator It =
+		GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		ALSPlayerController* PC =
+			Cast<ALSPlayerController>(It->Get());
+		if (PC && PC->IsLocalController())
+		{
+			PC->UpdateHUDPlayersAlive(PlayersAlive);
 			break;
 		}
 	}

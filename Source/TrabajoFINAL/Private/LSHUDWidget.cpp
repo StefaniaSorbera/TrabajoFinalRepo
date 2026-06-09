@@ -70,6 +70,15 @@ ULSPlayerHUDWidget* ULSHUDWidget::GetPlayerHUD(int32 PlayerIdx)
 	}
 }
 
+void ULSHUDWidget::UpdatePlayersAlive(int32 PlayersAlive)
+{
+	if (!TXT_PlayersAlive) return;
+
+	FString Text = FString::Printf(
+		TEXT("%d"), PlayersAlive);
+	TXT_PlayersAlive->SetText(FText::FromString(Text));
+}
+
 void ULSHUDWidget::EliminatePlayer(int32 PlayerIdx)
 {
 	ULSPlayerHUDWidget* Target = nullptr;

@@ -3,6 +3,7 @@
 #include "LSPlayerController.h"
 #include "LSPlayerState.h"
 #include "LSGameMode.h"
+#include "LSGameState.h"
 #include "LSRespawnPoint.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -11,6 +12,8 @@
 #include "Components/SphereComponent.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/KismetSystemLibrary.h"
+
+class ALSGameState;
 
 ALSCharacter::ALSCharacter()
 {
@@ -100,8 +103,52 @@ ALSCharacter::ALSCharacter()
                 }
             }
         }
+    FTimerHandle Handle;
+    GetWorldTimerManager().SetTimer(Handle, [this]()
+    {
+        ApplyPlayerMaterial();
+    }, 0.5f, false);
     }
+void ALSCharacter::ApplyPlayerMaterial()
+{
+    if (MaterialSlotIndex < 0) return;
 
+    ALSGameState* GS = GetWorld()->GetGameState<ALSGameState>();
+    if (!GS || !GS->PlayerMaterials.IsValidIndex(MaterialSlotIndex)) return;
+
+    if (BallMesh)
+    {
+        BallMesh->SetMaterial(0, GS->PlayerMaterials[MaterialSlotIndex]);
+    }
+}
+
+void ALSCharacter::OnRep_PlayerMaterial()
+{
+    FTimerHandle Handle;
+    GetWorldTimerManager().SetTimer(Handle, [this]()
+    {
+        ApplyPlayerMaterial();
+    }, 0.5f, false);
+}
+
+void ALSCharacter::OnRep_PlayerColor()
+{
+    ApplyPlayerColor();
+}
+
+void ALSCharacter::ApplyPlayerColor()
+{
+    if (!BallMesh) return;
+
+    UMaterialInstanceDynamic* DynMat =
+        BallMesh->CreateAndSetMaterialInstanceDynamic(0);
+
+    if (DynMat)
+    {
+        DynMat->SetVectorParameterValue(
+            TEXT("Color"), PlayerColor);
+    }
+}
 void ALSCharacter::OnBallOverlap(
     UPrimitiveComponent* OverlappedComp,
     AActor* OtherActor,
@@ -144,7 +191,7 @@ void ALSCharacter::GetLifetimeReplicatedProps(
     TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
+    DOREPLIFETIME(ALSCharacter, MaterialSlotIndex);
     DOREPLIFETIME(ALSCharacter, HeartsLeft);
     DOREPLIFETIME(ALSCharacter, bIsDead);
 }
@@ -515,7 +562,7 @@ void ALSCharacter::ApplyKnockbackLogic(ALSCharacter* OtherChar, const FVector& K
 
     // El que pega — rebote suave solo en XY
     GetCharacterMovement()->AddImpulse(
-        -KnockDir * (ImpulseScale * 10.2f), true);
+        -KnockDir * (ImpulseScale * 10.0f), true);
 }
 
 bool ALSCharacter::Server_ApplyKnockback_Validate(ALSCharacter* OtherChar, const FVector& KnockDir, float ImpulseScale)

@@ -19,6 +19,9 @@ public:
     ALSPlayerController();
     UFUNCTION(BlueprintCallable, Category = "HUD")
     void UpdateHUDHearts(int32 PlayerIdx, int32 HeartsLeft);
+    
+    UFUNCTION(BlueprintCallable, Category = "HUD")
+    void UpdateHUDPlayersAlive(int32 PlayersAlive);
 
     UFUNCTION(BlueprintCallable, Category = "HUD")
     void UpdateHUDKills(int32 PlayerIdx, int32 Kills);
