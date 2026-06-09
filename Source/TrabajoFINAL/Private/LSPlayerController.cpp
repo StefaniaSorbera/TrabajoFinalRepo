@@ -5,6 +5,7 @@
 #include "LSDeathWidget.h"
 #include "LSPlayerState.h"
 #include "Camera/CameraActor.h"
+#include "GameFramework/Character.h"
 #include "GameFramework/GameStateBase.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -17,7 +18,8 @@ void ALSPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	bAutoManageActiveCameraTarget = false;  // <- primero esto
-
+	SetInputMode(FInputModeGameOnly());
+	bShowMouseCursor = false;
 	if (IsLocalController())
 	{
 		FTimerHandle CamHandle;
@@ -47,6 +49,29 @@ void ALSPlayerController::BeginPlay()
 		// Removemos el timer de InitializeHUD
 		// ahora lo llama el servidor via Client_InitializeHUD
 	}
+}
+void ALSPlayerController::ClientForceRotation_Implementation(FRotator NewRotation)
+{
+	SetControlRotation(NewRotation);
+
+	if (APawn* MyPawn = GetPawn())
+	{
+		MyPawn->SetActorRotation(NewRotation);
+
+		if (ACharacter* Char = Cast<ACharacter>(MyPawn))
+			Char->bUseControllerRotationYaw = true;
+	}
+
+	FTimerHandle TimerHandle_Rot;
+	GetWorldTimerManager().SetTimer(
+		TimerHandle_Rot,
+		[this, NewRotation]()
+		{
+			SetControlRotation(NewRotation);
+			if (APawn* MyPawn = GetPawn())
+				MyPawn->SetActorRotation(NewRotation);
+		},
+		0.3f, false);
 }
 void ALSPlayerController::InitializeHUD()
 {

@@ -83,6 +83,15 @@ void ALSGameMode::BeginPlay()
         &ALSGameMode::AssignHUDSlots,
         1.f,
         false);
+    
+    for (FConstPlayerControllerIterator It =
+        GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    {
+        if (APlayerController* PC = It->Get())
+        {
+            PC->SetControlRotation(FRotator::ZeroRotator);
+        }
+    }
 }
 
 
@@ -96,6 +105,16 @@ void ALSGameMode::PostLogin(APlayerController* NewPlayer)
     {
         AssignHUDSlots();
     }, 0.3f, false);
+    NewPlayer->SetControlRotation(FRotator::ZeroRotator); // reset al entrar
+    
+    if (APawn* Pawn = NewPlayer->GetPawn())
+    {
+        Pawn->SetActorRotation(FRotator::ZeroRotator);
+        NewPlayer->SetControlRotation(FRotator::ZeroRotator);
+
+        if (ALSPlayerController* PC = Cast<ALSPlayerController>(NewPlayer))
+            PC->ClientForceRotation(FRotator::ZeroRotator);
+    }
 }
 
 void ALSGameMode::PlayerDied(AController* DeadPlayer,

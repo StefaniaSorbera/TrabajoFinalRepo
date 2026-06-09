@@ -109,6 +109,27 @@ ALSCharacter::ALSCharacter()
         ApplyPlayerMaterial();
     }, 0.5f, false);
     }
+
+void ALSCharacter::PossessedBy(AController* NewController)
+{
+    Super::PossessedBy(NewController);
+
+    // Alineamos el ControlRotation con la rotación actual del personaje
+    if (APlayerController* PC = Cast<APlayerController>(NewController))
+    {
+        PC->SetControlRotation(GetActorRotation());
+    }
+}
+
+void ALSCharacter::OnRep_Controller()
+{
+    Super::OnRep_Controller();
+
+    if (APlayerController* PC = Cast<APlayerController>(GetController()))
+    {
+        PC->SetControlRotation(GetActorRotation());
+    }
+}
 void ALSCharacter::ApplyPlayerMaterial()
 {
     if (MaterialSlotIndex < 0) return;

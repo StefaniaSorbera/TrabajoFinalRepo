@@ -93,6 +93,7 @@ public:
     UFUNCTION()
     void OnRep_PlayerMaterial();
 
+    void OnRep_Controller();
     void ApplyPlayerMaterial();
     UFUNCTION()
     void OnRep_PlayerColor();
@@ -121,6 +122,7 @@ UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
 class ACameraActor* LevelCamera;
 protected:
     virtual void BeginPlay() override;
+    void PossessedBy(AController* NewController);
 
     // RepNotify corazones → actualiza HUD
     UFUNCTION()
