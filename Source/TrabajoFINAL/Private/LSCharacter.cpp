@@ -385,21 +385,10 @@ void ALSCharacter::LoseHeart()
         GetController()->GetPlayerState<ALSPlayerState>();
     if (PS) PS->SetLivesLeft(HeartsLeft);
 
-    // Llamamos manualmente para el servidor/host
-    // pasamos el índice correcto
     int32 PlayerIdx = PS ? PS->HUDSlotIndex : 0;
 
-    // Actualizamos en todos los controllers locales
-    for (FConstPlayerControllerIterator It =
-        GetWorld()->GetPlayerControllerIterator(); It; ++It)
-    {
-        ALSPlayerController* PC =
-            Cast<ALSPlayerController>(It->Get());
-        if (PC && PC->IsLocalController())
-        {
-            PC->UpdateHUDHearts(PlayerIdx, HeartsLeft);
-        }
-    }
+    // Multicast — notifica a TODOS los clientes
+    Multicast_UpdateHearts(PlayerIdx, HeartsLeft);
 
     if (HeartsLeft <= 0)
     {
@@ -411,7 +400,22 @@ void ALSCharacter::LoseHeart()
     }
 }
 
-
+void ALSCharacter::Multicast_UpdateHearts_Implementation(
+    int32 PlayerIdx, int32 NewHearts)
+{
+    // Corre en servidor + todos los clientes
+    for (FConstPlayerControllerIterator It =
+        GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    {
+        ALSPlayerController* PC =
+            Cast<ALSPlayerController>(It->Get());
+        if (PC && PC->IsLocalPlayerController())
+        {
+            PC->UpdateHUDHearts(PlayerIdx, NewHearts);
+            break;
+        }
+    }
+}
 void ALSCharacter::HandleDeath()
 {
     if (GetLocalRole() != ROLE_Authority) return;
@@ -566,7 +570,6 @@ void ALSCharacter::Multicast_PlayRespawnFX_Implementation()
     // Siempre oculto
     GetMesh()->SetVisibility(false);
 }
-
 void ALSCharacter::Multicast_PlayDashFX_Implementation()
 {
     // Acá podés agregar partículas o sonido de dash

@@ -65,12 +65,15 @@ public:
 
     // Llamado desde FellOutOfWorld
     void LoseHeart();
+    void Multicast_UpdateHearts_Implementation(int32 PlayerIdx, int32 NewHearts);
 
     // --- Server RPCs ---
     UFUNCTION(Server, Reliable, WithValidation)
     void Server_Dash();
 
     // --- Multicast RPCs ---
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_UpdateHearts(int32 PlayerIdx, int32 NewHearts);
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_PlayDeathFX();
 

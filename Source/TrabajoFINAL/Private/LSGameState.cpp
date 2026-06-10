@@ -30,7 +30,7 @@ void ALSGameState::SetPlayersAlive(int32 NewCount)
 	if (GetLocalRole() == ROLE_Authority)
 	{
 		PlayersAlive = NewCount;
-		OnRep_PlayersAlive(); // Para que el servidor también actualice su HUD
+		OnRep_PlayersAlive();
 	}
 }
 
@@ -38,24 +38,37 @@ void ALSGameState::AddPlayerState(APlayerState* PlayerState)
 {
 	Super::AddPlayerState(PlayerState);
 
-	// Se llama en servidor Y en clientes cuando llega un nuevo PlayerState
 	UWorld* World = GetWorld();
 	if (!World) return;
-
-	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	
+	FTimerHandle Handle;
+	World->GetTimerManager().SetTimer(Handle, [this, World]()
 	{
-		ALSPlayerController* PC = Cast<ALSPlayerController>(It->Get());
-		if (PC && PC->IsLocalController())
+	
+		bool bAllSlotsAssigned = true;
+		for (APlayerState* PS : PlayerArray)
 		{
-			// Esperamos un frame para que HUDSlotIndex esté replicado
-			FTimerHandle Handle;
-			World->GetTimerManager().SetTimer(Handle, [PC]()
+			ALSPlayerState* LSPS =
+				Cast<ALSPlayerState>(PS);
+			if (LSPS && LSPS->HUDSlotIndex == -1)
 			{
-				PC->InitializeHUD();
-			}, 0.2f, false);
-			break;
+				bAllSlotsAssigned = false;
+				break;
+			}
 		}
-	}
+
+		for (FConstPlayerControllerIterator It =
+			World->GetPlayerControllerIterator(); It; ++It)
+		{
+			ALSPlayerController* PC =
+				Cast<ALSPlayerController>(It->Get());
+			if (PC && PC->IsLocalController())
+			{
+				PC->Client_InitializeHUD();
+				break;
+			}
+		}
+	}, 1.5f, false);
 }
 void ALSGameState::DecrementPlayersAlive()
 {
