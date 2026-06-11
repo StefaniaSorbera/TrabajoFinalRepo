@@ -73,87 +73,12 @@ void ALSPlayerController::ClientForceRotation_Implementation(FRotator NewRotatio
 		},
 		0.3f, false);
 }
-void ALSPlayerController::InitializeHUD()
-{
-	if (!HUDWidget) return;
-
-	for (int32 i = 0; i < 4; i++)
-	{
-		HUDWidget->SetPlayerSlotVisible(i, false);
-	}
-
-	TArray<FLinearColor> PlayerColors = {
-		FLinearColor(0.1f, 0.4f, 0.9f, 1.f),
-		FLinearColor(0.9f, 0.2f, 0.1f, 1.f),
-		FLinearColor(0.13f, 0.99f, 0.1f, 1.f),
-		FLinearColor(0.95f, 0.1f, 0.9f, 1.f)
-	};
-
-	TArray<FString> PlayerNames = {
-		TEXT("Jugador 1"),
-		TEXT("Jugador 2"),
-		TEXT("Jugador 3"),
-		TEXT("Jugador 4")
-	};
-
-	AGameStateBase* GS = GetWorld()->GetGameState();
-	if (!GS) return;
-
-	// ===== LOGS DE DIAGNÓSTICO =====
-	UE_LOG(LogTemp, Warning, TEXT("=== InitializeHUD | Controller=%s | PlayerArray=%d ==="),
-		*GetName(), GS->PlayerArray.Num());
-	// ================================
-
-	for (APlayerState* PS : GS->PlayerArray)
-	{
-		ALSPlayerState* LSPS = Cast<ALSPlayerState>(PS);
-		if (!LSPS) continue;
-
-		// ===== LOG POR CADA JUGADOR =====
-		UE_LOG(LogTemp, Warning, TEXT("  >> Player=%s | Slot=%d | Lives=%d"),
-			*LSPS->GetPlayerName(), LSPS->HUDSlotIndex, LSPS->LivesLeft);
-		// ================================
-
-		int32 Idx = LSPS->HUDSlotIndex;
-		if (Idx < 0 || Idx >= 4) continue;
-
-		HUDWidget->SetPlayerSlotVisible(Idx, true);
-
-		ULSPlayerHUDWidget* PlayerHUD = HUDWidget->GetPlayerHUD(Idx);
-		if (PlayerHUD)
-		{
-			PlayerHUD->InitPlayer(Idx, PlayerNames[Idx], PlayerColors[Idx]);
-			PlayerHUD->SetHearts(LSPS->LivesLeft);
-		}
-	}
-}
 void ALSPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 }
 
 // --- Client RPCs ---
-
-void ALSPlayerController::Client_InitializeHUD_Implementation()
-{
-	if (bHUDInitialized) return;
-	bHUDInitialized = true;
-
-	if (HUDWidget)
-	{
-		InitializeHUD();
-	}
-	else
-	{
-		FTimerHandle InitHandle;
-		GetWorldTimerManager().SetTimer(
-			InitHandle,
-			this,
-			&ALSPlayerController::InitializeHUD,
-			0.5f,
-			false);
-	}
-}
 
 void ALSPlayerController::Client_ShowVictory_Implementation()
 {
@@ -255,4 +180,111 @@ void ALSPlayerController::Client_StartRestartCountdown_Implementation(
 		EndGameWidget->StartCountdown(Seconds);
 	}
 	BP_StartRestartCountdown(Seconds);
+}
+
+void ALSPlayerController::Client_InitializeHUD_Implementation()
+{
+    // No usamos bHUDInitialized para permitir reintentos
+    if (HUDWidget)
+    {
+        InitializeHUD();
+    }
+    else
+    {
+        FTimerHandle InitHandle;
+        GetWorldTimerManager().SetTimer(
+            InitHandle,
+            this,
+            &ALSPlayerController::InitializeHUD,
+            0.5f,
+            false);
+    }
+}
+
+void ALSPlayerController::InitializeHUD()
+{
+    if (!HUDWidget) return;
+
+    AGameStateBase* GS = GetWorld()->GetGameState();
+    if (!GS) return;
+
+    // Verificamos si todos los slots están asignados
+    bool bAllReady = true;
+    for (APlayerState* PS : GS->PlayerArray)
+    {
+        ALSPlayerState* LSPS = Cast<ALSPlayerState>(PS);
+        if (LSPS && LSPS->HUDSlotIndex == -1)
+        {
+            bAllReady = false;
+            break;
+        }
+    }
+
+    // Si no están listos reintentamos en 0.5s
+    if (!bAllReady)
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("InitializeHUD — slots no listos, reintentando..."));
+        FTimerHandle RetryHandle;
+        GetWorldTimerManager().SetTimer(
+            RetryHandle,
+            this,
+            &ALSPlayerController::InitializeHUD,
+            0.5f,
+            false);
+        return;
+    }
+
+    // Ocultamos todos los slots primero
+    for (int32 i = 0; i < 4; i++)
+    {
+        HUDWidget->SetPlayerSlotVisible(i, false);
+    }
+
+    TArray<FLinearColor> PlayerColors = {
+        FLinearColor(0.1f, 0.4f, 0.9f, 1.f),
+        FLinearColor(0.9f, 0.2f, 0.1f, 1.f),
+        FLinearColor(0.13f, 0.99f, 0.1f, 1.f),
+        FLinearColor(0.95f, 0.1f, 0.9f, 1.f)
+    };
+
+    TArray<FString> PlayerNames = {
+        TEXT("Jugador 1"),
+        TEXT("Jugador 2"),
+        TEXT("Jugador 3"),
+        TEXT("Jugador 4")
+    };
+
+    UE_LOG(LogTemp, Warning,
+        TEXT("=== InitializeHUD | Controller=%s | PlayerArray=%d ==="),
+        *GetName(), GS->PlayerArray.Num());
+
+    for (APlayerState* PS : GS->PlayerArray)
+    {
+        ALSPlayerState* LSPS = Cast<ALSPlayerState>(PS);
+        if (!LSPS) continue;
+
+        UE_LOG(LogTemp, Warning,
+            TEXT("  >> Player=%s | Slot=%d | Lives=%d"),
+            *LSPS->GetPlayerName(),
+            LSPS->HUDSlotIndex,
+            LSPS->LivesLeft);
+
+        int32 Idx = LSPS->HUDSlotIndex;
+        if (Idx < 0 || Idx >= 4) continue;
+
+        HUDWidget->SetPlayerSlotVisible(Idx, true);
+
+        ULSPlayerHUDWidget* PlayerHUD =
+            HUDWidget->GetPlayerHUD(Idx);
+        if (PlayerHUD)
+        {
+            PlayerHUD->InitPlayer(
+                Idx, PlayerNames[Idx], PlayerColors[Idx]);
+            PlayerHUD->SetHearts(LSPS->LivesLeft);
+        }
+    }
+
+    // Marcamos como inicializado solo cuando todo salió bien
+    bHUDInitialized = true;
 }
