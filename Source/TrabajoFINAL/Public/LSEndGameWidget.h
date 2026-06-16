@@ -7,44 +7,45 @@
 UCLASS()
 class TRABAJOFINAL_API ULSEndGameWidget : public UUserWidget
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	UPROPERTY(meta = (BindWidget))
-	class UTextBlock* TXT_Result;
+    UPROPERTY(meta = (BindWidget))
+    class UTextBlock* TXT_Result;
 
-	UPROPERTY(meta = (BindWidget))
-	class UTextBlock* TXT_Subtitle;
+    UPROPERTY(meta = (BindWidget))
+    class UTextBlock* TXT_Subtitle;
 
-	UPROPERTY(meta = (BindWidget))
-	class UTextBlock* TXT_Countdown;
+    UPROPERTY(meta = (BindWidget))
+    class UTextBlock* TXT_Countdown;
 
-	UPROPERTY(meta = (BindWidget))
-	class UImage* IMG_Result;
+    UPROPERTY(meta = (BindWidget))
+    class UImage* IMG_Result;
 
-	// Texturas asignadas en el Blueprint
-	UPROPERTY(EditAnywhere, Category = "EndGame")
-	UTexture2D* VictoryTexture;
+    UPROPERTY(EditAnywhere, Category = "EndGame")
+    UTexture2D* VictoryTexture;
 
-	UPROPERTY(EditAnywhere, Category = "EndGame")
-	UTexture2D* DefeatTexture;
+    UPROPERTY(EditAnywhere, Category = "EndGame")
+    UTexture2D* DefeatTexture;
 
-	UFUNCTION(BlueprintCallable, Category = "EndGame")
-	void SetupAsVictory();
+    UFUNCTION(BlueprintCallable, Category = "EndGame")
+    void SetupAsVictory();
 
-	UFUNCTION(BlueprintCallable, Category = "EndGame")
-	void SetupAsDefeat();
+    UFUNCTION(BlueprintCallable, Category = "EndGame")
+    void SetupAsDefeat();
 
-	UFUNCTION(BlueprintCallable, Category = "EndGame")
-	void StartCountdown(float Seconds);
+    UFUNCTION(BlueprintCallable, Category = "EndGame")
+    void StartCountdown(float Seconds);
 
 protected:
-	virtual void NativeConstruct() override;
-	virtual void NativeDestruct() override;
+    virtual void NativeConstruct() override;
+    virtual void NativeDestruct() override;
 
 private:
-	float RemainingTime = 0.f;
-	FTimerHandle CountdownHandle;
+    float RemainingTime = 0.f;
+    FTimerHandle CountdownHandle;
 
-	void OnCountdownTick();
+    void SetupResult(const FString& ResultText, const FLinearColor& ResultColor,
+                     const FString& SubtitleText, UTexture2D* ResultTexture);
+    void OnCountdownTick();
 };

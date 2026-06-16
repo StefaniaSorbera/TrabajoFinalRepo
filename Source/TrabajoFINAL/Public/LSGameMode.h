@@ -7,40 +7,35 @@
 UCLASS()
 class TRABAJOFINAL_API ALSGameMode : public AGameModeBase
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	ALSGameMode();
+    ALSGameMode();
 
-	// Llamado desde LSCharacter::HandleDeath
-	void PlayerDied(AController* DeadPlayer,
-					AController* Killer);
+    void PlayerDied(AController* DeadPlayer, AController* Killer);
 
 protected:
-	virtual void BeginPlay() override;
-	virtual void PostLogin(APlayerController* NewPlayer) override;
-	virtual AActor* FindPlayerStart_Implementation(
-		AController* Player,
-		const FString& IncomingName) override;
-	void CheckVictoryCondition();
-	void AssignHUDSlots();
-	UPROPERTY(EditDefaultsOnly, Category = "Players")
-	TArray<UMaterialInterface*> PlayerMaterials;
-	void EndMatch(AController* Winner);
-	void OnMatchTimeUp();
+    virtual void BeginPlay() override;
+    virtual void PostLogin(APlayerController* NewPlayer) override;
+    virtual AActor* FindPlayerStart_Implementation(AController* Player, const FString& IncomingName) override;
 
-	// Tiempo límite en segundos
-	UPROPERTY(EditDefaultsOnly, Category = "Match")
-	float MatchDuration = 180.f;
+    UPROPERTY(EditDefaultsOnly, Category = "Players")
+    TArray<UMaterialInterface*> PlayerMaterials;
 
-	FTimerHandle MatchTimerHandle;
-	FTimerHandle MatchTickHandle;
+    UPROPERTY(EditDefaultsOnly, Category = "Match")
+    float MatchDuration = 180.f;
 
-	void RestartMatch();
-	
-	FTimerHandle AssignSlotsHandle;
-	FTimerHandle RestartTimerHandle;
+    UPROPERTY(EditDefaultsOnly, Category = "Match")
+    float RestartDelay = 5.f;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Match")
-	float RestartDelay = 5.f;
+    FTimerHandle MatchTickHandle;
+    FTimerHandle AssignSlotsHandle;
+    FTimerHandle RestartTimerHandle;
+
+private:
+    void CheckVictoryCondition();
+    void AssignHUDSlots();
+    void EndMatch(AController* Winner);
+    void OnMatchTimeUp();
+    void RestartMatch();
 };

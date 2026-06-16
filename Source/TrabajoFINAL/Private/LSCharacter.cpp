@@ -4,152 +4,101 @@
 #include "LSPlayerState.h"
 #include "LSGameMode.h"
 #include "LSGameState.h"
-#include "LSRespawnPoint.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
-#include "NavigationSystem.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SphereComponent.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/KismetSystemLibrary.h"
-
-class ALSGameState;
 
 ALSCharacter::ALSCharacter()
 {
     bReplicates = true;
     PrimaryActorTick.bCanEverTick = true;
 
-    // --- Esfera visual ---
-    BallMesh = CreateDefaultSubobject<UStaticMeshComponent>(
-        TEXT("BallMesh"));
+    BallMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BallMesh"));
     BallMesh->SetupAttachment(RootComponent);
-    BallMesh->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
     BallMesh->SetRelativeScale3D(FVector(1.8f, 1.8f, 1.8f));
-
-    // Sin colisión propia — la maneja BallCollision
-    BallMesh->SetCollisionEnabled(
-        ECollisionEnabled::NoCollision);
-
-    // Replicamos el movimiento visual
+    BallMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     BallMesh->SetIsReplicated(true);
 
-    // --- Esfera de colisión de rebote ---
-    BallCollision = CreateDefaultSubobject<USphereComponent>(
-        TEXT("BallCollision"));
+    BallCollision = CreateDefaultSubobject<USphereComponent>(TEXT("BallCollision"));
     BallCollision->SetupAttachment(RootComponent);
     BallCollision->SetSphereRadius(55.f);
-    BallCollision->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
-
-    // Solo detecta overlap, no bloquea
-    BallCollision->SetCollisionEnabled(
-        ECollisionEnabled::QueryOnly);
-    BallCollision->SetCollisionObjectType(
-        ECC_Pawn);
-    BallCollision->SetCollisionResponseToAllChannels(
-        ECR_Ignore);
-    BallCollision->SetCollisionResponseToChannel(
-        ECC_Pawn, ECR_Overlap);
-
+    BallCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    BallCollision->SetCollisionObjectType(ECC_Pawn);
+    BallCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
+    BallCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
     BallCollision->SetIsReplicated(true);
-    
-    // --- Movimiento tipo pelota (menos hielo) ---
-    GetCharacterMovement()->GroundFriction = 8.f;          // default 8, subilo si frena muy rápido
-    GetCharacterMovement()->BrakingDecelerationWalking = 500.f;  // default 2048 — esto es lo que los frena en seco
-    GetCharacterMovement()->BrakingFrictionFactor = 1.f;   // default 2 — reduce el freno al soltar
-    GetCharacterMovement()->MaxAcceleration = 800.f;       // default 2048 — aceleración más gradual
-    GetCharacterMovement()->MaxWalkSpeed = 800.f;          // ajustá a gusto
 
-    // Ocultamos el Skeletal Mesh del template
+    GetCharacterMovement()->GroundFriction              = BallGroundFriction;
+    GetCharacterMovement()->BrakingDecelerationWalking  = BallBrakingDeceleration;
+    GetCharacterMovement()->BrakingFrictionFactor       = 1.f;
+    GetCharacterMovement()->MaxAcceleration             = 800.f;
+    GetCharacterMovement()->MaxWalkSpeed                = 800.f;
+
     GetMesh()->SetVisibility(false);
-
-    // Ajustamos la cápsula al tamaño de la pelota
     GetCapsuleComponent()->SetCapsuleRadius(55.f);
     GetCapsuleComponent()->SetCapsuleHalfHeight(55.f);
-    
-    // En el constructor, después de crearlos:
-    GetCharacterMovement()->BrakingDecelerationWalking = BallBrakingDeceleration;
-    GetCharacterMovement()->GroundFriction = BallGroundFriction;
 }
-// -----------------------------------------------
-// REPLICACIÓN
-// -----------------------------------------------
 
-    void ALSCharacter::BeginPlay()
+void ALSCharacter::BeginPlay()
+{
+    Super::BeginPlay();
+
+    BallCollision->OnComponentBeginOverlap.AddDynamic(this, &ALSCharacter::OnBallOverlap);
+
+    if (IsLocallyControlled())
     {
-        Super::BeginPlay();
-
-        // Todos bindean el overlap, no solo el servidor
-        BallCollision->OnComponentBeginOverlap.AddDynamic(
-            this, &ALSCharacter::OnBallOverlap);
-
-        // --- NUEVO: cámara del nivel ---
-        if (IsLocallyControlled())
+        if (APlayerController* PC = Cast<APlayerController>(GetController()))
         {
-            APlayerController* PC =
-                Cast<APlayerController>(GetController());
-
-            if (PC)
+            if (ACameraActor* LevelCam = Cast<ACameraActor>(
+                UGameplayStatics::GetActorOfClass(GetWorld(), ACameraActor::StaticClass())))
             {
-                ACameraActor* LevelCam =
-                    Cast<ACameraActor>(
-                        UGameplayStatics::GetActorOfClass(
-                            GetWorld(), ACameraActor::StaticClass()));
-
-                if (LevelCam)
-                {
-                    PC->SetViewTargetWithBlend(
-                        LevelCam, 0.f);
-                }
+                PC->SetViewTargetWithBlend(LevelCam, 0.f);
             }
         }
-    FTimerHandle Handle;
-    GetWorldTimerManager().SetTimer(Handle, [this]()
-    {
-        ApplyPlayerMaterial();
-    }, 0.5f, false);
     }
+
+    FTimerHandle Handle;
+    GetWorldTimerManager().SetTimer(Handle, [this]() { ApplyPlayerMaterial(); }, 0.5f, false);
+}
 
 void ALSCharacter::PossessedBy(AController* NewController)
 {
     Super::PossessedBy(NewController);
-
-    // Alineamos el ControlRotation con la rotación actual del personaje
     if (APlayerController* PC = Cast<APlayerController>(NewController))
-    {
         PC->SetControlRotation(GetActorRotation());
-    }
 }
 
 void ALSCharacter::OnRep_Controller()
 {
     Super::OnRep_Controller();
-
     if (APlayerController* PC = Cast<APlayerController>(GetController()))
-    {
         PC->SetControlRotation(GetActorRotation());
-    }
 }
+
+void ALSCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(ALSCharacter, MaterialSlotIndex);
+    DOREPLIFETIME(ALSCharacter, HeartsLeft);
+    DOREPLIFETIME(ALSCharacter, bIsDead);
+}
+
 void ALSCharacter::ApplyPlayerMaterial()
 {
     if (MaterialSlotIndex < 0) return;
-
     ALSGameState* GS = GetWorld()->GetGameState<ALSGameState>();
     if (!GS || !GS->PlayerMaterials.IsValidIndex(MaterialSlotIndex)) return;
-
     if (BallMesh)
-    {
         BallMesh->SetMaterial(0, GS->PlayerMaterials[MaterialSlotIndex]);
-    }
 }
 
 void ALSCharacter::OnRep_PlayerMaterial()
 {
     FTimerHandle Handle;
-    GetWorldTimerManager().SetTimer(Handle, [this]()
-    {
-        ApplyPlayerMaterial();
-    }, 0.5f, false);
+    GetWorldTimerManager().SetTimer(Handle, [this]() { ApplyPlayerMaterial(); }, 0.5f, false);
 }
 
 void ALSCharacter::OnRep_PlayerColor()
@@ -160,16 +109,21 @@ void ALSCharacter::OnRep_PlayerColor()
 void ALSCharacter::ApplyPlayerColor()
 {
     if (!BallMesh) return;
-
-    UMaterialInstanceDynamic* DynMat =
-        BallMesh->CreateAndSetMaterialInstanceDynamic(0);
-
-    if (DynMat)
-    {
-        DynMat->SetVectorParameterValue(
-            TEXT("Color"), PlayerColor);
-    }
+    if (UMaterialInstanceDynamic* DynMat = BallMesh->CreateAndSetMaterialInstanceDynamic(0))
+        DynMat->SetVectorParameterValue(TEXT("Color"), PlayerColor);
 }
+
+ALSPlayerController* ALSCharacter::GetLocalPlayerController() const
+{
+    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    {
+        ALSPlayerController* PC = Cast<ALSPlayerController>(It->Get());
+        if (PC && PC->IsLocalPlayerController())
+            return PC;
+    }
+    return nullptr;
+}
+
 void ALSCharacter::OnBallOverlap(
     UPrimitiveComponent* OverlappedComp,
     AActor* OtherActor,
@@ -179,68 +133,30 @@ void ALSCharacter::OnBallOverlap(
     const FHitResult& SweepResult)
 {
     ALSCharacter* OtherChar = Cast<ALSCharacter>(OtherActor);
-    if (!OtherChar || !OtherChar->IsAlive() || !IsAlive()) return;
-
-    // AGREGAR: evitar que se ejecute dos veces en host
-    // (una vez por cada pelota que detecta el overlap)
-    if (!IsLocallyControlled()) return;
+    if (!OtherChar || !OtherChar->IsAlive() || !IsAlive() || !IsLocallyControlled()) return;
 
     FVector KnockDir = (OtherChar->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
-
     float Speed = FMath::Clamp(GetCharacterMovement()->Velocity.Size(), 300.f, 1500.f);
     float ImpulseScale = FMath::GetMappedRangeValueClamped(
-       FVector2D(300.f, 1500.f),
-       FVector2D(900.f, KnockbackStrength),  // mínimo: 600 → 900
-       Speed);
+        FVector2D(300.f, 1500.f),
+        FVector2D(900.f, KnockbackStrength),
+        Speed);
 
     if (HasAuthority())
-    {
         ApplyKnockbackLogic(OtherChar, KnockDir, ImpulseScale);
-    }
     else
     {
-        // RPC al servidor
         Server_ApplyKnockback(OtherChar, KnockDir, ImpulseScale);
-
-        // Predicción local del rebote propio
-        GetCharacterMovement()->AddImpulse(
-     FVector(-KnockDir.X, -KnockDir.Y, 0.f) * (ImpulseScale * 0.4f), true);
+        GetCharacterMovement()->AddImpulse(FVector(-KnockDir.X, -KnockDir.Y, 0.f) * (ImpulseScale * 0.4f), true);
     }
-}
-
-void ALSCharacter::GetLifetimeReplicatedProps(
-    TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-    DOREPLIFETIME(ALSCharacter, MaterialSlotIndex);
-    DOREPLIFETIME(ALSCharacter, HeartsLeft);
-    DOREPLIFETIME(ALSCharacter, bIsDead);
 }
 
 void ALSCharacter::OnRep_HeartsLeft()
 {
-    // Obtenemos el slot del jugador dueño de este Character
     ALSPlayerState* PS = GetPlayerState<ALSPlayerState>();
     if (!PS) return;
-
-    int32 PlayerIdx = PS->HUDSlotIndex;
-
-    // Buscamos el controller local del cliente
-    // (puede ser cualquier jugador, no necesariamente el dueño)
-    for (FConstPlayerControllerIterator It =
-        GetWorld()->GetPlayerControllerIterator(); It; ++It)
-    {
-        ALSPlayerController* PC =
-            Cast<ALSPlayerController>(It->Get());
-
-        // IsLocalPlayerController verifica que sea
-        // el controller que corre en ESTE cliente
-        if (PC && PC->IsLocalPlayerController())
-        {
-            PC->UpdateHUDHearts(PlayerIdx, HeartsLeft);
-            break;
-        }
-    }
+    if (ALSPlayerController* PC = GetLocalPlayerController())
+        PC->UpdateHUDHearts(PS->HUDSlotIndex, HeartsLeft);
 }
 
 void ALSCharacter::OnRep_bIsDead()
@@ -248,58 +164,28 @@ void ALSCharacter::OnRep_bIsDead()
     if (bIsDead)
     {
         BallMesh->SetVisibility(false);
-        BallCollision->SetCollisionEnabled(
-            ECollisionEnabled::NoCollision);
+        BallCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     }
     else
     {
         BallMesh->SetVisibility(true);
-        BallCollision->SetCollisionEnabled(
-            ECollisionEnabled::QueryOnly);
+        BallCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     }
-
-    // Nos aseguramos que el SkeletalMesh
-    // del template SIEMPRE esté oculto
     GetMesh()->SetVisibility(false);
 }
 
 void ALSCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
-
     if (!BallMesh) return;
 
     FVector Velocity = GetCharacterMovement()->Velocity;
-
-    // Si está quieto no rota
     if (Velocity.SizeSquared() < 100.f) return;
 
-    // Velocidad en espacio local del actor
-    FVector LocalVel =
-        GetActorTransform().InverseTransformVectorNoScale(Velocity);
-
-    // Una pelota que rueda: el eje de rotación es
-    // perpendicular a la dirección de movimiento
-    // Cross product entre la dirección de movimiento
-    // y el vector "arriba" da el eje correcto
-    FVector MoveDir = Velocity.GetSafeNormal();
-    FVector UpVector = FVector::UpVector;
-    FVector RotAxis = FVector::CrossProduct(UpVector, MoveDir);
-
-    // Velocidad angular proporcional a la velocidad lineal
-    float Speed = Velocity.Size();
-    float DegreesPerSecond = Speed * 0.5f;
-
-    // Rotamos sobre el eje correcto
-    FQuat DeltaQuat(RotAxis, 
-        FMath::DegreesToRadians(DegreesPerSecond * DeltaTime));
-
-    BallMesh->AddWorldRotation(DeltaQuat);
+    FVector RotAxis = FVector::CrossProduct(FVector::UpVector, Velocity.GetSafeNormal());
+    float DegreesPerSecond = Velocity.Size() * 0.5f;
+    BallMesh->AddWorldRotation(FQuat(RotAxis, FMath::DegreesToRadians(DegreesPerSecond * DeltaTime)));
 }
-
-// -----------------------------------------------
-// DASH — SERVER RPC
-// -----------------------------------------------
 
 void ALSCharacter::OnDashPressed()
 {
@@ -307,32 +193,19 @@ void ALSCharacter::OnDashPressed()
     Server_Dash();
 }
 
-bool ALSCharacter::Server_Dash_Validate()
-{
-    return true;
-}
+bool ALSCharacter::Server_Dash_Validate() { return true; }
 
 void ALSCharacter::Server_Dash_Implementation()
 {
     if (!bCanDash || bIsDead) return;
 
     bCanDash = false;
-
-    // Aplicamos impulso en la dirección que mira el personaje
-    FVector DashDirection =
-        GetActorForwardVector().GetSafeNormal();
-    GetCharacterMovement()->AddImpulse(
-        DashDirection * DashImpulseStrength, true);
-
-    // Efecto visual para todos
+    GetCharacterMovement()->AddImpulse(GetActorForwardVector().GetSafeNormal() * DashImpulseStrength, true);
     Multicast_PlayDashFX();
 
-    // Detectamos jugadores cercanos para aplicar knockback
     TArray<AActor*> NearbyActors;
     UKismetSystemLibrary::SphereOverlapActors(
-        GetWorld(),
-        GetActorLocation(),
-        KnockbackRadius,
+        GetWorld(), GetActorLocation(), KnockbackRadius,
         TArray<TEnumAsByte<EObjectTypeQuery>>(),
         ALSCharacter::StaticClass(),
         TArray<AActor*>{ this },
@@ -340,259 +213,135 @@ void ALSCharacter::Server_Dash_Implementation()
 
     for (AActor* Actor : NearbyActors)
     {
-        ALSCharacter* OtherChar =
-            Cast<ALSCharacter>(Actor);
+        ALSCharacter* OtherChar = Cast<ALSCharacter>(Actor);
         if (OtherChar && OtherChar->IsAlive())
         {
-            // Dirección del empuje: desde nosotros hacia el otro
-            FVector KnockDir =
-                (OtherChar->GetActorLocation() -
-                 GetActorLocation()).GetSafeNormal();
-
+            FVector KnockDir = (OtherChar->GetActorLocation() - GetActorLocation()).GetSafeNormal();
             OtherChar->GetCharacterMovement()->AddImpulse(
-    FVector(KnockDir.X, KnockDir.Y, 0.f) * KnockbackStrength, true);
+                FVector(KnockDir.X, KnockDir.Y, 0.f) * KnockbackStrength, true);
         }
     }
 
-    // Reseteamos cooldown
-    GetWorldTimerManager().SetTimer(
-        DashCooldownHandle,
-        [this]() { bCanDash = true; },
-        DashCooldown,
-        false);
+    GetWorldTimerManager().SetTimer(DashCooldownHandle, [this]() { bCanDash = true; }, DashCooldown, false);
 }
-
-// -----------------------------------------------
-// MUERTE POR CAÍDA
-// -----------------------------------------------
 
 void ALSCharacter::FellOutOfWorld(const UDamageType& DmgType)
 {
     if (GetLocalRole() == ROLE_Authority && !bIsDead)
-    {
         LoseHeart();
-    }
 }
 
 void ALSCharacter::LoseHeart()
 {
-    if (GetLocalRole() != ROLE_Authority) return;
-    if (bIsInvincible) return;
+    if (GetLocalRole() != ROLE_Authority || bIsInvincible) return;
 
     HeartsLeft = FMath::Max(0, HeartsLeft - 1);
 
-    ALSPlayerState* PS =
-        GetController()->GetPlayerState<ALSPlayerState>();
+    ALSPlayerState* PS = GetController()->GetPlayerState<ALSPlayerState>();
     if (PS) PS->SetLivesLeft(HeartsLeft);
 
     int32 PlayerIdx = PS ? PS->HUDSlotIndex : 0;
-
-    // Multicast — notifica a TODOS los clientes
     Multicast_UpdateHearts(PlayerIdx, HeartsLeft);
 
     if (HeartsLeft <= 0)
-    {
         HandleDeath();
-    }
     else
-    {
         HandleRespawn();
-    }
 }
 
-void ALSCharacter::Multicast_UpdateHearts_Implementation(
-    int32 PlayerIdx, int32 NewHearts)
+void ALSCharacter::Multicast_UpdateHearts_Implementation(int32 PlayerIdx, int32 NewHearts)
 {
-    // Corre en servidor + todos los clientes
-    for (FConstPlayerControllerIterator It =
-        GetWorld()->GetPlayerControllerIterator(); It; ++It)
-    {
-        ALSPlayerController* PC =
-            Cast<ALSPlayerController>(It->Get());
-        if (PC && PC->IsLocalPlayerController())
-        {
-            PC->UpdateHUDHearts(PlayerIdx, NewHearts);
-            break;
-        }
-    }
+    if (ALSPlayerController* PC = GetLocalPlayerController())
+        PC->UpdateHUDHearts(PlayerIdx, NewHearts);
 }
+
 void ALSCharacter::HandleDeath()
 {
     if (GetLocalRole() != ROLE_Authority) return;
-
     bIsDead = true;
     Multicast_PlayDeathFX();
-
-    ALSGameMode* GM =
-        GetWorld()->GetAuthGameMode<ALSGameMode>();
-    if (GM)
-    {
+    if (ALSGameMode* GM = GetWorld()->GetAuthGameMode<ALSGameMode>())
         GM->PlayerDied(GetController(), nullptr);
-    }
 }
 
 void ALSCharacter::HandleRespawn()
 {
     if (GetLocalRole() != ROLE_Authority) return;
-
     bIsDead = true;
     Multicast_PlayDeathFX();
-
-    ALSPlayerController* PC =
-        Cast<ALSPlayerController>(GetController());
-
-    UE_LOG(LogTemp, Warning,
-        TEXT("HandleRespawn — PC: %s | DeathWidgetClass: %s"),
-        PC ? *PC->GetName() : TEXT("NULL"),
-        PC && PC->DeathWidgetClass ?
-            TEXT("ASIGNADO") : TEXT("NULL"));
-
-    if (PC)
-    {
+    if (ALSPlayerController* PC = Cast<ALSPlayerController>(GetController()))
         PC->Client_ShowDeathScreen();
-    }
-
-    GetWorldTimerManager().SetTimer(
-        RespawnHandle,
-        this,
-        &ALSCharacter::DoRespawn,
-        RespawnDelay,
-        false);
+    GetWorldTimerManager().SetTimer(RespawnHandle, this, &ALSCharacter::DoRespawn, RespawnDelay, false);
 }
 
 void ALSCharacter::DoRespawn()
 {
     if (GetLocalRole() != ROLE_Authority) return;
 
-    ALSPlayerState* PS =
-        GetController()->GetPlayerState<ALSPlayerState>();
+    ALSPlayerState* PS = GetController()->GetPlayerState<ALSPlayerState>();
     int32 SlotIndex = PS ? PS->HUDSlotIndex : 0;
-
-    UE_LOG(LogTemp, Warning,
-        TEXT("DoRespawn — Player=%s SlotIndex=%d"),
-        PS ? *PS->GetPlayerName() : TEXT("NULL"),
-        SlotIndex);
-
     FString SpawnTag = FString::Printf(TEXT("Spawn%d"), SlotIndex);
 
     TArray<AActor*> SpawnPoints;
-    UGameplayStatics::GetAllActorsOfClass(
-        GetWorld(),
-        APlayerStart::StaticClass(),
-        SpawnPoints);
+    UGameplayStatics::GetAllActorsOfClass(GetWorld(), APlayerStart::StaticClass(), SpawnPoints);
 
     FVector SpawnLocation = FVector(0.f, 0.f, 300.f);
-    bool bFoundSpawn = false;
-
     for (AActor* SpawnPoint : SpawnPoints)
     {
-        UE_LOG(LogTemp, Warning,
-            TEXT("SpawnPoint encontrado: %s — Tags: %d"),
-            *SpawnPoint->GetName(),
-            SpawnPoint->Tags.Num());
-
-        for (FName Tag : SpawnPoint->Tags)
-        {
-            UE_LOG(LogTemp, Warning,
-                TEXT("  Tag: %s"), *Tag.ToString());
-        }
-
         if (SpawnPoint->ActorHasTag(FName(*SpawnTag)))
         {
-            SpawnLocation =
-                SpawnPoint->GetActorLocation() +
-                FVector(0.f, 0.f, 100.f);
-            bFoundSpawn = true;
-
-            UE_LOG(LogTemp, Warning,
-                TEXT("Spawn encontrado: %s para Slot %d"),
-                *SpawnPoint->GetName(), SlotIndex);
+            SpawnLocation = SpawnPoint->GetActorLocation() + FVector(0.f, 0.f, 100.f);
             break;
         }
     }
 
-    if (!bFoundSpawn)
-    {
-        UE_LOG(LogTemp, Warning,
-            TEXT("NO se encontró spawn para tag: %s"),
-            *SpawnTag);
-    }
-
-    // resto del código igual...
     SetActorLocation(SpawnLocation);
     GetCharacterMovement()->StopMovementImmediately();
     bIsDead = false;
     bIsInvincible = true;
-    GetWorldTimerManager().SetTimer(
-        InvincibilityHandle,
-        [this]() { bIsInvincible = false; },
-        InvincibilityDuration, false);
+    GetWorldTimerManager().SetTimer(InvincibilityHandle, [this]() { bIsInvincible = false; }, InvincibilityDuration, false);
     Multicast_PlayRespawnFX();
 
-    APlayerController* PC =
-        Cast<APlayerController>(GetController());
-    if (PC)
+    if (APlayerController* PC = Cast<APlayerController>(GetController()))
     {
-        ACameraActor* LevelCam = Cast<ACameraActor>(
-            UGameplayStatics::GetActorOfClass(
-                GetWorld(), ACameraActor::StaticClass()));
-        if (LevelCam)
+        if (ACameraActor* LevelCam = Cast<ACameraActor>(
+            UGameplayStatics::GetActorOfClass(GetWorld(), ACameraActor::StaticClass())))
+        {
             PC->SetViewTargetWithBlend(LevelCam, 0.f);
+        }
     }
 }
-
-// -----------------------------------------------
-// MULTICAST
-// -----------------------------------------------
 
 void ALSCharacter::Multicast_PlayDeathFX_Implementation()
 {
     BallMesh->SetVisibility(false);
-    BallCollision->SetCollisionEnabled(
-        ECollisionEnabled::NoCollision);
-    GetCapsuleComponent()->SetCollisionEnabled(
-        ECollisionEnabled::NoCollision);
+    BallCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     GetCharacterMovement()->DisableMovement();
-
-    // Siempre oculto
     GetMesh()->SetVisibility(false);
 }
 
 void ALSCharacter::Multicast_PlayRespawnFX_Implementation()
 {
     BallMesh->SetVisibility(true);
-    BallCollision->SetCollisionEnabled(
-        ECollisionEnabled::QueryOnly);
-    GetCapsuleComponent()->SetCollisionEnabled(
-        ECollisionEnabled::QueryAndPhysics);
+    BallCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
     GetCharacterMovement()->SetMovementMode(MOVE_Walking);
-
-    // Siempre oculto
     GetMesh()->SetVisibility(false);
 }
+
 void ALSCharacter::Multicast_PlayDashFX_Implementation()
 {
-    // Acá podés agregar partículas o sonido de dash
-    UE_LOG(LogTemp, Log, TEXT("%s hizo dash"), *GetName());
 }
 
 void ALSCharacter::ApplyKnockbackLogic(ALSCharacter* OtherChar, const FVector& KnockDir, float ImpulseScale)
 {
     if (!OtherChar || !HasAuthority()) return;
-
-    // Impactado — impulso fuerte solo en XY
-    OtherChar->GetCharacterMovement()->AddImpulse(
-        KnockDir * ImpulseScale, true);
-
-    // El que pega — rebote suave solo en XY
-    GetCharacterMovement()->AddImpulse(
-        -KnockDir * (ImpulseScale * 10.0f), true);
+    OtherChar->GetCharacterMovement()->AddImpulse(KnockDir * ImpulseScale, true);
+    GetCharacterMovement()->AddImpulse(-KnockDir * (ImpulseScale * 10.0f), true);
 }
 
-bool ALSCharacter::Server_ApplyKnockback_Validate(ALSCharacter* OtherChar, const FVector& KnockDir, float ImpulseScale)
-{
-    return true;
-}
+bool ALSCharacter::Server_ApplyKnockback_Validate(ALSCharacter* OtherChar, const FVector& KnockDir, float ImpulseScale) { return true; }
 
 void ALSCharacter::Server_ApplyKnockback_Implementation(ALSCharacter* OtherChar, const FVector& KnockDir, float ImpulseScale)
 {

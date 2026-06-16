@@ -7,54 +7,46 @@
 UCLASS()
 class TRABAJOFINAL_API ALSBumper : public AActor
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	ALSBumper();
+    ALSBumper();
 
-	// Colisión que detecta el overlap
-	UPROPERTY(VisibleAnywhere, Category = "Components")
-	class UBoxComponent* BumperVolume;
+    UPROPERTY(VisibleAnywhere, Category = "Components")
+    class UBoxComponent* BumperVolume;
 
-	// Mesh visual del bumper
-	UPROPERTY(VisibleAnywhere, Category = "Components")
-	class UStaticMeshComponent* BumperMesh;
+    UPROPERTY(VisibleAnywhere, Category = "Components")
+    class UStaticMeshComponent* BumperMesh;
 
-	// Fuerza del impulso
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bumper")
-	float ImpulseStrength = 1500.f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bumper")
+    float ImpulseStrength = 1500.f;
 
-	// Fuerza vertical del impulso
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bumper")
-	float VerticalImpulse = 400.f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bumper")
+    float VerticalImpulse = 400.f;
 
 protected:
-	virtual void BeginPlay() override;
-	
-	UFUNCTION(NetMulticast, Unreliable)
-	void Multicast_PlayHitEffect();
-	
-	UFUNCTION()
-	void OnBumperOverlap(
-		UPrimitiveComponent* OverlappedComp,
-		AActor* OtherActor,
-		UPrimitiveComponent* OtherComp,
-		int32 OtherBodyIndex,
-		bool bFromSweep,
-		const FHitResult& SweepResult);
-	// Escala original del mesh
-	FVector DefaultScale;
+    virtual void BeginPlay() override;
 
-	// Escala al recibir impacto
-	UPROPERTY(EditAnywhere, Category = "Bumper")
-	FVector HitScale = FVector(1.3f, 1.3f, 0.7f);
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_PlayHitEffect();
 
-	// Duración del efecto
-	UPROPERTY(EditAnywhere, Category = "Bumper")
-	float HitEffectDuration = 0.15f;
+    UFUNCTION()
+    void OnBumperOverlap(
+        UPrimitiveComponent* OverlappedComp,
+        AActor* OtherActor,
+        UPrimitiveComponent* OtherComp,
+        int32 OtherBodyIndex,
+        bool bFromSweep,
+        const FHitResult& SweepResult);
 
-	FTimerHandle HitEffectHandle;
+    UPROPERTY(EditAnywhere, Category = "Bumper")
+    FVector HitScale = FVector(1.3f, 1.3f, 0.7f);
 
-	void PlayHitEffect();
-	void ResetScale();
+    UPROPERTY(EditAnywhere, Category = "Bumper")
+    float HitEffectDuration = 0.15f;
+
+    FVector DefaultScale;
+    FTimerHandle HitEffectHandle;
+
+    void ResetScale();
 };

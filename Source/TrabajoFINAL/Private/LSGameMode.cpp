@@ -15,145 +15,97 @@ ALSGameMode::ALSGameMode()
     PlayerControllerClass = ALSPlayerController::StaticClass();
     DefaultPawnClass      = ALSCharacter::StaticClass();
 }
-// En LSGameMode.cpp:
-AActor* ALSGameMode::FindPlayerStart_Implementation(
-    AController* Player, const FString& IncomingName)
-{
-    ALSPlayerState* PS =
-        Player->GetPlayerState<ALSPlayerState>();
-    int32 SlotIndex = PS ? PS->HUDSlotIndex : 0;
 
-    FString SpawnTag =
-        FString::Printf(TEXT("Spawn%d"), SlotIndex);
+AActor* ALSGameMode::FindPlayerStart_Implementation(AController* Player, const FString& IncomingName)
+{
+    ALSPlayerState* PS = Player->GetPlayerState<ALSPlayerState>();
+    FString SpawnTag = FString::Printf(TEXT("Spawn%d"), PS ? PS->HUDSlotIndex : 0);
 
     TArray<AActor*> SpawnPoints;
-    UGameplayStatics::GetAllActorsOfClass(
-        GetWorld(),
-        APlayerStart::StaticClass(),
-        SpawnPoints);
+    UGameplayStatics::GetAllActorsOfClass(GetWorld(), APlayerStart::StaticClass(), SpawnPoints);
 
     for (AActor* SpawnPoint : SpawnPoints)
     {
         if (SpawnPoint->ActorHasTag(FName(*SpawnTag)))
-        {
             return SpawnPoint;
-        }
     }
 
-    return Super::FindPlayerStart_Implementation(
-        Player, IncomingName);
+    return Super::FindPlayerStart_Implementation(Player, IncomingName);
 }
+
 void ALSGameMode::BeginPlay()
 {
     Super::BeginPlay();
 
-    ALSGameState* GS = GetGameState<ALSGameState>();
-    if (GS)
+    if (ALSGameState* GS = GetGameState<ALSGameState>())
     {
         GS->SetMatchState(EMatchState::InProgress);
         GS->PlayersAlive = GetNumPlayers();
         GS->SetMatchTime(MatchDuration);
     }
 
-    // Timer del match
-    GetWorldTimerManager().SetTimer(
-        MatchTickHandle,
-        [this]()
+    GetWorldTimerManager().SetTimer(MatchTickHandle, [this]()
+    {
+        ALSGameState* GS = GetGameState<ALSGameState>();
+        if (!GS) return;
+        float NewTime = FMath::Max(0.f, GS->MatchTime - 1.f);
+        GS->SetMatchTime(NewTime);
+        if (NewTime <= 0.f)
         {
-            ALSGameState* GS = GetGameState<ALSGameState>();
-            if (!GS) return;
+            GetWorldTimerManager().ClearTimer(MatchTickHandle);
+            OnMatchTimeUp();
+        }
+    }, 1.f, true);
 
-            float NewTime = GS->MatchTime - 1.f;
-            GS->SetMatchTime(FMath::Max(0.f, NewTime));
+    GetWorldTimerManager().SetTimer(AssignSlotsHandle, this, &ALSGameMode::AssignHUDSlots, 1.f, false);
 
-            if (NewTime <= 0.f)
-            {
-                GetWorldTimerManager().ClearTimer(MatchTickHandle);
-                OnMatchTimeUp();
-            }
-        },
-        1.f,
-        true);
-
-    // Asignamos slots con delay para que todos
-    // los PlayerStates estén inicializados
-    GetWorldTimerManager().SetTimer(
-        AssignSlotsHandle,        // <- agregar este handle en .h
-        this,
-        &ALSGameMode::AssignHUDSlots,
-        1.f,
-        false);
-    
-    for (FConstPlayerControllerIterator It =
-        GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
         if (APlayerController* PC = It->Get())
-        {
             PC->SetControlRotation(FRotator::ZeroRotator);
-        }
     }
 }
-
 
 void ALSGameMode::PostLogin(APlayerController* NewPlayer)
 {
     Super::PostLogin(NewPlayer);
-    // Reasignamos todos los slots cada vez que entra un jugador
-    // con un pequeño delay para que el PlayerState esté inicializado
+
     FTimerHandle Handle;
-    GetWorldTimerManager().SetTimer(Handle, [this]()
-    {
-        AssignHUDSlots();
-    }, 0.3f, false);
-    NewPlayer->SetControlRotation(FRotator::ZeroRotator); // reset al entrar
-    
+    GetWorldTimerManager().SetTimer(Handle, [this]() { AssignHUDSlots(); }, 0.3f, false);
+
+    NewPlayer->SetControlRotation(FRotator::ZeroRotator);
+
     if (APawn* Pawn = NewPlayer->GetPawn())
     {
         Pawn->SetActorRotation(FRotator::ZeroRotator);
-        NewPlayer->SetControlRotation(FRotator::ZeroRotator);
-
         if (ALSPlayerController* PC = Cast<ALSPlayerController>(NewPlayer))
             PC->ClientForceRotation(FRotator::ZeroRotator);
     }
 }
 
-void ALSGameMode::PlayerDied(AController* DeadPlayer,
-                             AController* Killer)
+void ALSGameMode::PlayerDied(AController* DeadPlayer, AController* Killer)
 {
     if (!HasAuthority()) return;
 
-    // Sumamos kill al asesino
     if (Killer && Killer != DeadPlayer)
     {
-        ALSPlayerState* KillerPS =
-            Killer->GetPlayerState<ALSPlayerState>();
-        if (KillerPS) KillerPS->AddKill();
-
-        // Actualizamos HUD del killer
-        ALSPlayerController* KillerPC =
-            Cast<ALSPlayerController>(Killer);
-        if (KillerPC)
+        if (ALSPlayerState* KillerPS = Killer->GetPlayerState<ALSPlayerState>())
         {
-            KillerPC->BP_UpdateKillCount(
-                KillerPS->KillCount);
+            KillerPS->AddKill();
+            if (ALSPlayerController* KillerPC = Cast<ALSPlayerController>(Killer))
+                KillerPC->BP_UpdateKillCount(KillerPS->KillCount);
         }
     }
 
-    // Marcamos al jugador muerto
-    ALSPlayerState* DeadPS =
-        DeadPlayer->GetPlayerState<ALSPlayerState>();
-    if (DeadPS) DeadPS->SetPlayerDead();
+    if (ALSPlayerState* DeadPS = DeadPlayer->GetPlayerState<ALSPlayerState>())
+        DeadPS->SetPlayerDead();
 
-    // Decrementamos jugadores vivos en GameState
-    ALSGameState* GS = GetGameState<ALSGameState>();
-    if (GS) GS->DecrementPlayersAlive();
+    if (ALSGameState* GS = GetGameState<ALSGameState>())
+        GS->DecrementPlayersAlive();
 
-    // Notificamos derrota al cliente eliminado
-    ALSPlayerController* DeadPC =
-        Cast<ALSPlayerController>(DeadPlayer);
-    if (DeadPC) DeadPC->Client_ShowDefeat();
+    if (ALSPlayerController* DeadPC = Cast<ALSPlayerController>(DeadPlayer))
+        DeadPC->Client_ShowDefeat();
 
-    // Chequeamos si alguien ganó
     CheckVictoryCondition();
 }
 
@@ -161,127 +113,82 @@ void ALSGameMode::CheckVictoryCondition()
 {
     TArray<AController*> AlivePlayers;
 
-    for (FConstPlayerControllerIterator It =
-        GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
-        ALSPlayerController* PC =
-            Cast<ALSPlayerController>(It->Get());
+        ALSPlayerController* PC = Cast<ALSPlayerController>(It->Get());
         if (!PC) continue;
-
-        ALSPlayerState* PS =
-            PC->GetPlayerState<ALSPlayerState>();
-
-        // Contamos solo los que siguen vivos
+        ALSPlayerState* PS = PC->GetPlayerState<ALSPlayerState>();
         if (PS && PS->IsAlive())
-        {
             AlivePlayers.Add(PC);
-        }
     }
 
     if (AlivePlayers.Num() == 1)
-    {
-        // Hay un ganador
         EndMatch(AlivePlayers[0]);
-    }
     else if (AlivePlayers.Num() == 0)
-    {
-        // Todos muertos al mismo tiempo — empate
         EndMatch(nullptr);
-    }
-    // Si quedan 2+ vivos seguimos jugando
 }
 
 void ALSGameMode::AssignHUDSlots()
 {
     int32 SlotIndex = 0;
 
-    for (FConstPlayerControllerIterator It =
-        GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
-        ALSPlayerController* PC =
-            Cast<ALSPlayerController>(It->Get());
+        ALSPlayerController* PC = Cast<ALSPlayerController>(It->Get());
         if (!PC) continue;
 
-        ALSPlayerState* PS =
-            PC->GetPlayerState<ALSPlayerState>();
-        if (PS)
+        ALSPlayerState* PS = PC->GetPlayerState<ALSPlayerState>();
+        if (!PS) continue;
+
+        PS->HUDSlotIndex = SlotIndex;
+
+        if (PlayerMaterials.IsValidIndex(SlotIndex))
         {
-            PS->HUDSlotIndex = SlotIndex;
-
-            // Asignamos material según slot
-            if (PlayerMaterials.IsValidIndex(SlotIndex))
+            if (ALSCharacter* Char = Cast<ALSCharacter>(PC->GetPawn()))
             {
-                ALSCharacter* Char = Cast<ALSCharacter>(PC->GetPawn());
-                UE_LOG(LogTemp, Warning, TEXT("Pawn: %s, Char valid: %s, SlotIndex: %d"),
-                    *PC->GetName(),
-                    Char ? TEXT("SI") : TEXT("NO"),
-                    SlotIndex);
-
-                if (Char)
-                {
-                    Char->MaterialSlotIndex = SlotIndex;
-                    Char->ApplyPlayerMaterial();
-                    UE_LOG(LogTemp, Warning, TEXT("Material seteado en servidor para slot %d"), SlotIndex);
-                }
+                Char->MaterialSlotIndex = SlotIndex;
+                Char->ApplyPlayerMaterial();
             }
-
-            SlotIndex++;
         }
+
+        SlotIndex++;
     }
-    
-    ALSGameState* GS = GetGameState<ALSGameState>();
-    if (GS)
-    {
-        GS->SetPlayersAlive(SlotIndex); // SlotIndex al final == cantidad real de jugadores
-    }
-    
+
+    if (ALSGameState* GS = GetGameState<ALSGameState>())
+        GS->SetPlayersAlive(SlotIndex);
+
     FTimerHandle NotifyHandle;
-    GetWorldTimerManager().SetTimer(
-        NotifyHandle,
-        [this]()
+    GetWorldTimerManager().SetTimer(NotifyHandle, [this]()
+    {
+        for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
         {
-            for (FConstPlayerControllerIterator It =
-                GetWorld()->GetPlayerControllerIterator();
-                It; ++It)
-            {
-                ALSPlayerController* PC =
-                    Cast<ALSPlayerController>(It->Get());
-                if (PC) PC->Client_InitializeHUD();
-            }
-        },
-        0.5f,
-        false);
+            if (ALSPlayerController* PC = Cast<ALSPlayerController>(It->Get()))
+                PC->Client_InitializeHUD();
+        }
+    }, 0.5f, false);
 }
+
 void ALSGameMode::EndMatch(AController* Winner)
 {
     GetWorldTimerManager().ClearTimer(MatchTickHandle);
 
-    ALSGameState* GS = GetGameState<ALSGameState>();
-    if (GS) GS->SetMatchState(EMatchState::PostGame);
+    if (ALSGameState* GS = GetGameState<ALSGameState>())
+        GS->SetMatchState(EMatchState::PostGame);
 
-    for (FConstPlayerControllerIterator It =
-        GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
-        ALSPlayerController* PC =
-            Cast<ALSPlayerController>(It->Get());
+        ALSPlayerController* PC = Cast<ALSPlayerController>(It->Get());
         if (!PC) continue;
 
-        // Congelamos input
         PC->SetIgnoreMoveInput(true);
         PC->SetIgnoreLookInput(true);
 
-        // Congelamos el pawn físicamente
-        if (APawn* Pawn = PC->GetPawn())
+        if (ALSCharacter* Char = Cast<ALSCharacter>(PC->GetPawn()))
         {
-            if (ALSCharacter* Char = Cast<ALSCharacter>(Pawn))
-            {
-                Char->GetCharacterMovement()->StopMovementImmediately();
-                Char->GetCharacterMovement()->DisableMovement();
-                Char->GetCharacterMovement()->StopMovementImmediately();
-                Char->GetCharacterMovement()->DisableMovement();
-                Char->GetCharacterMovement()->GravityScale = 0.f; // <- evita la caída
-                Char->SetActorEnableCollision(false); // opcional: evita que otros lo empujen
-            }
+            Char->GetCharacterMovement()->StopMovementImmediately();
+            Char->GetCharacterMovement()->DisableMovement();
+            Char->GetCharacterMovement()->GravityScale = 0.f;
+            Char->SetActorEnableCollision(false);
         }
 
         if (PC == Winner)
@@ -292,19 +199,15 @@ void ALSGameMode::EndMatch(AController* Winner)
         PC->Client_StartRestartCountdown(RestartDelay);
     }
 
-    GetWorldTimerManager().SetTimer(
-        RestartTimerHandle, this,
-        &ALSGameMode::RestartMatch,
-        5.f, false);
+    GetWorldTimerManager().SetTimer(RestartTimerHandle, this, &ALSGameMode::RestartMatch, 5.f, false);
 }
+
 void ALSGameMode::RestartMatch()
 {
-    // Reiniciamos el nivel para todos
-    GetWorld()->ServerTravel(
-        TEXT("?listen"), false);
+    GetWorld()->ServerTravel(TEXT("?listen"), false);
 }
+
 void ALSGameMode::OnMatchTimeUp()
 {
-    // Se acabó el tiempo — chequeamos sobrevivientes
     CheckVictoryCondition();
 }

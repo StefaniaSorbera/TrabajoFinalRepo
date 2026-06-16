@@ -1,71 +1,55 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
 #include "LSGameState.generated.h"
 
-// Enum para los estados posibles de la partida
 UENUM(BlueprintType)
 enum class EMatchState : uint8
 {
-	WaitingToStart  UMETA(DisplayName = "Waiting To Start"),
-	InProgress      UMETA(DisplayName = "In Progress"),
-	PostGame        UMETA(DisplayName = "Post Game")
+    WaitingToStart  UMETA(DisplayName = "Waiting To Start"),
+    InProgress      UMETA(DisplayName = "In Progress"),
+    PostGame        UMETA(DisplayName = "Post Game")
 };
 
 UCLASS()
 class TRABAJOFINAL_API ALSGameState : public AGameStateBase
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	ALSGameState();
+    ALSGameState();
 
-	// --- Variables replicadas ---
+    UPROPERTY(ReplicatedUsing = OnRep_MatchTime, BlueprintReadOnly, Category = "Match")
+    float MatchTime = 0.f;
 
-	// Tiempo restante — con RepNotify (actualiza el HUD automáticamente)
-	UPROPERTY(ReplicatedUsing = OnRep_MatchTime, BlueprintReadOnly, Category = "Match")
-	float MatchTime = 0.f;
-	
-	UPROPERTY(Replicated, EditDefaultsOnly, Category = "Players")
-	TArray<UMaterialInterface*> PlayerMaterials;
-	// Estado actual de la partida
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Match")
-	EMatchState MatchState = EMatchState::WaitingToStart;
+    UPROPERTY(Replicated, EditDefaultsOnly, Category = "Players")
+    TArray<UMaterialInterface*> PlayerMaterials;
 
-	// Cantidad de jugadores vivos
-	UPROPERTY(ReplicatedUsing = OnRep_PlayersAlive,
-	BlueprintReadOnly, Category = "Match")
-	int32 PlayersAlive = 0;
-	UFUNCTION()
-	
-	void OnRep_PlayersAlive();
+    UPROPERTY(Replicated, BlueprintReadOnly, Category = "Match")
+    EMatchState MatchState = EMatchState::WaitingToStart;
 
-	// --- Funciones ---
+    UPROPERTY(ReplicatedUsing = OnRep_PlayersAlive, BlueprintReadOnly, Category = "Match")
+    int32 PlayersAlive = 0;
 
-	// El GameMode llama esto para actualizar el tiempo
-	void SetMatchTime(float NewTime);
+    void SetMatchTime(float NewTime);
+    void DecrementPlayersAlive();
+    void SetMatchState(EMatchState NewState);
 
-	// El GameMode llama esto cuando muere un jugador
-	void DecrementPlayersAlive();
-	
-	UFUNCTION(BlueprintCallable)
-	void SetPlayersAlive(int32 NewCount);
+    UFUNCTION(BlueprintCallable)
+    void SetPlayersAlive(int32 NewCount);
 
-	virtual void AddPlayerState(APlayerState* PlayerState) override;
-	
-	// El GameMode llama esto para cambiar el estado
-	void SetMatchState(EMatchState NewState);
+    virtual void AddPlayerState(APlayerState* PlayerState) override;
 
 protected:
-	// Se ejecuta en clientes cuando cambia MatchTime
-	UFUNCTION()
-	void OnRep_MatchTime();
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	// Necesario para registrar las variables replicadas
-	virtual void GetLifetimeReplicatedProps(
-		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+private:
+    UFUNCTION()
+    void OnRep_MatchTime();
+
+    UFUNCTION()
+    void OnRep_PlayersAlive();
+
+    class ALSPlayerController* GetLocalPlayerController() const;
 };
